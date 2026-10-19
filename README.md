@@ -58,6 +58,14 @@ python src/chatbot.py "Which night is busiest?"
 
 Run the clean, analyse and forecast scripts first. Set `GRILLHOUSE_MODEL` to try another Ollama model.
 
+### Chat page
+
+`src/web_chat.py` serves a password-protected chat page at http://localhost:8501. On a Mac, double-click
+`start_assistant.command`: it asks for a password the first time (stored in the git-ignored `.env`), starts
+Ollama, keeps the Mac awake and opens the page. Other devices can use it from anywhere through
+[Tailscale](https://tailscale.com); the server refuses connections from any network other than this computer
+and the Tailscale network.
+
 ## Roadmap
 
 - [x] Data cleaning
@@ -66,4 +74,4 @@ Run the clean, analyse and forecast scripts first. Set `GRILLHOUSE_MODEL` to try
 - [x] Knowledge base (reports, tables, opening hours)
 - [x] Chatbot (command line, local model)
 - [ ] Menu with prices in the knowledge base
-- [ ] Chat window (web page)
+- [x] Chat window (web page, password, Tailscale access)
