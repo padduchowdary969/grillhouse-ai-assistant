@@ -90,9 +90,13 @@ Tailscale · macOS launchd · Git/GitHub
   units.
 - **Conversation memory:** a short rolling window of past turns supports follow-up questions. The retrieved
   facts aren't kept in that history, which saves context space.
-- **Evaluation:** a hand-checked test set of factual, time-based, forecast, follow-up and **unanswerable**
-  questions. Retrieval and prompt problems were fixed in rounds until every test question was answered
-  correctly. One known weakness of a small model remains: occasional overconfidence on "sometimes" facts.
+- **Evaluation:** an automated test set ([`src/evaluate_chatbot.py`](../src/evaluate_chatbot.py)) of 11
+  questions covering facts, timing, forecasts, reviews and **unanswerable** questions (to check the model
+  refuses instead of guessing). Each case scores **retrieval hit** (was the right chunk retrieved?) and
+  **answer correctness** (does the reply contain the expected values, read from the data so the same tests run
+  on real and synthetic data?). Current score: **11/11 retrieval and 11/11 answers** on both datasets, median
+  response time 10–14 s. One known weakness of a small model remains: occasional overconfidence on
+  "sometimes" facts.
 
 ### ⑦ Deployment: [`src/web_chat.py`](../src/web_chat.py), [`install_autostart.command`](../install_autostart.command)
 
@@ -123,7 +127,7 @@ several times slower. A local model kept the project free and private.
 
 Retrieval-augmented generation (RAG) · TF-IDF sparse retrieval · top-k retrieval · chunking · open-weights
 LLM · 4-bit quantization · local / on-device inference · context window · system prompt · prompt engineering ·
-grounding · hallucination mitigation · temperature · response streaming · conversational memory ·
+grounding · hallucination mitigation · evaluation (retrieval hit rate, answer accuracy) · temperature · response streaming · conversational memory ·
 backtesting · prediction intervals · feature engineering · synthetic data · data minimisation
 
 ## 7. Next steps
@@ -132,7 +136,7 @@ backtesting · prediction intervals · feature engineering · synthetic data · 
 - **Better search:** move to **dense retrieval** with an embedding model such as `nomic-embed-text` for
   meaning-based matching.
 - **Better forecasts:** switch to daily data to capture weekly and seasonal patterns.
-- **Automated evaluation:** a scored test set with an LLM acting as judge.
+- **Richer evaluation:** more test cases and an LLM acting as judge for open-ended answers.
 - **Server option:** a Docker image for running it on a server.
 
 ## Try it

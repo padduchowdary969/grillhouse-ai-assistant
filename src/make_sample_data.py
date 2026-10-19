@@ -191,6 +191,19 @@ def main() -> None:
         df.to_csv(OUT / name, index=False, encoding=encoding)
         print(f"wrote {OUT / name} ({len(df)} rows)")
 
+    # Shop facts for the chatbot's knowledge base
+    (OUT / "knowledge").mkdir(exist_ok=True)
+    (OUT / "knowledge" / "opening_hours.txt").write_text(f"""{STORE}, Sampletown
+
+Opening time: 18:00 every evening.
+Closing time: 08:00 the next morning. On Saturday and Sunday mornings it sometimes stays open later, until 10:00.
+
+A "night" runs from 18:00 until closing the next morning, so an order at 04:00 on Sunday is part of Saturday night.
+
+Orders are taken through Uber Eats for delivery and pickup.
+""", encoding="utf-8")
+    print(f"wrote {OUT / 'knowledge' / 'opening_hours.txt'}")
+
 
 if __name__ == "__main__":
     main()

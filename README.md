@@ -45,6 +45,8 @@ Download these reports from Uber Eats Manager for the same date range and save t
   most accurate one (with an 80% range), and spreads each month over a typical week by night and hour.
 - `src/make_sample_data.py`: regenerates the synthetic files in `sample_data/`.
 - `src/chatbot.py`: answers questions in plain English using a free model that runs locally (see below).
+- `src/evaluate_chatbot.py`: scores the chatbot on 11 test questions (retrieval hit and answer correctness),
+  with expected answers read from the data so it works on real and sample data.
 
 ## Chatbot (free, runs on your computer)
 
