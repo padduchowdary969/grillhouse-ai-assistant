@@ -42,11 +42,28 @@ Download these reports from Uber Eats Manager for the same date range and save t
 - `src/forecast_ubereats.py`: tests three simple methods on past months, forecasts the next three with the
   most accurate one (with an 80% range), and spreads each month over a typical week by night and hour.
 - `src/make_sample_data.py`: regenerates the synthetic files in `sample_data/`.
+- `src/chatbot.py`: answers questions in plain English using a free model that runs locally (see below).
+
+## Chatbot (free, runs on your computer)
+
+The chatbot uses [Ollama](https://ollama.com) to run an open model locally, so it costs nothing and no
+business data leaves the machine. For each question it retrieves the most relevant sections of the reports,
+tables and `knowledge/*.txt` files (keyword TF-IDF search) and asks the model to answer only from them.
+
+```bash
+ollama pull qwen3:8b                     # once, about 5 GB
+python src/chatbot.py                    # chat; type "quit" to stop
+python src/chatbot.py "Which night is busiest?"
+```
+
+Run the clean, analyse and forecast scripts first. Set `GRILLHOUSE_MODEL` to try another Ollama model.
 
 ## Roadmap
 
 - [x] Data cleaning
 - [x] Analytics
 - [x] Forecasting
-- [ ] Knowledge base (menu, opening hours, reports)
-- [ ] Chatbot
+- [x] Knowledge base (reports, tables, opening hours)
+- [x] Chatbot (command line, local model)
+- [ ] Menu with prices in the knowledge base
+- [ ] Chat window (web page)
