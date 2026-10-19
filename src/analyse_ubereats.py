@@ -149,6 +149,55 @@ def chart_funnel(funnel: pd.DataFrame) -> Path:
     return finish(fig, ax, "5_funnel.png", grid_axis="x")
 
 
+# Keywords that group complaint comments (ratings of 3 or below) into themes
+COMPLAINT_THEMES = {
+    "Arrived cold": r"cold|not hot|room temperature|warm",
+    "Small portion": r"portion|half of the box|not even filled|smaller",
+    "Food quality": r"fake|not real|overcooked|not fresh|dry|terrible|smelt|\bill\b",
+    "Too spicy": r"spicy",
+    "Missing or wrong item": r"only one came|not the item|no gherkin",
+    "Slow delivery": r"hours|took|missed multiple turns",
+}
+
+
+def chart_ratings(reviews: pd.DataFrame) -> Path:
+    counts = reviews["rating"].value_counts().reindex([5, 4, 3, 2, 1], fill_value=0)
+    fig, ax = plt.subplots(figsize=(8, 3.4))
+    ax.barh([f"{s} star" for s in counts.index][::-1], counts.values[::-1], color=BLUE, height=0.6)
+    for y, v in enumerate(counts.values[::-1]):
+        ax.text(v + 2, y, f"{v}  ({v / counts.sum():.0%})", va="center", fontsize=9, color=INK_2)
+    ax.set_xlim(0, counts.max() * 1.2)
+    ax.set_title(f"Customer ratings ({len(reviews)} ratings, Apr – Oct 2026)")
+    ax.tick_params(axis="y", colors=INK, length=0)
+    return finish(fig, ax, "6_ratings.png", grid_axis="x")
+
+
+def reviews_section(reviews: pd.DataFrame) -> str:
+    low = reviews[reviews["rating"] <= 2]
+    complaints = reviews.loc[(reviews["rating"] <= 3) & (reviews["comment"] != ""), "comment"]
+    themes = {t: int(complaints.str.contains(p, case=False).sum()) for t, p in COMPLAINT_THEMES.items()}
+    tags = reviews.loc[reviews["tags"] != "", "tags"].str.split("; ").explode().value_counts()
+    by_type = reviews.groupby("fulfilment")["rating"].mean()
+    theme_lines = "\n".join(f"- {t}: {n}" for t, n in sorted(themes.items(), key=lambda kv: -kv[1]) if n)
+    tag_lines = "\n".join(f"- {t}: {n}" for t, n in tags.head(8).items())
+    return f"""
+## Customer ratings
+- {len(reviews)} ratings, {reviews['rated_on'].min()} to {reviews['rated_on'].max()}; average **{reviews['rating'].mean():.2f} / 5**
+- {(reviews['rating'] == 5).mean():.0%} gave 5 stars; {len(low)} ({len(low) / len(reviews):.0%}) gave 1 or 2 stars
+- Delivery {by_type.get('delivery', float('nan')):.2f} vs pickup {by_type.get('pickup', float('nan')):.2f} average rating
+- Median time from order to delivery: {reviews['delivery_minutes'].median():.0f} min overall, {low['delivery_minutes'].median():.0f} min for 1–2 star orders
+- {(reviews['comment'] != '').sum()} ratings include a written comment
+
+Complaint themes in comments rated 3 stars or below:
+{theme_lines}
+
+Most common rating tags:
+{tag_lines}
+
+![Ratings](6_ratings.png)
+"""
+
+
 def summary(monthly, items, hourly, funnel) -> str:
     year = monthly[monthly["month"] >= "2025-10"]
     peak = year.loc[year["sales"].idxmax()]
@@ -208,11 +257,14 @@ def main() -> None:
     items = pd.read_csv(CLEAN / "ubereats_items.csv")
     hourly = pd.read_csv(CLEAN / "ubereats_hourly.csv")
     funnel = pd.read_csv(CLEAN / "ubereats_funnel.csv")
+    reviews = pd.read_csv(CLEAN / "ubereats_reviews.csv", keep_default_na=False, na_values={"delivery_minutes": [""]})
 
-    for path in (chart_monthly(monthly), chart_items(items), chart_heatmap(hourly), chart_nights(hourly), chart_funnel(funnel)):
+    charts = (chart_monthly(monthly), chart_items(items), chart_heatmap(hourly), chart_nights(hourly),
+              chart_funnel(funnel), chart_ratings(reviews))
+    for path in charts:
         print(f"wrote {path}")
     report = OUT / "ubereats_summary.md"
-    report.write_text(summary(monthly, items, hourly, funnel), encoding="utf-8")
+    report.write_text(summary(monthly, items, hourly, funnel) + reviews_section(reviews), encoding="utf-8")
     print(f"wrote {report}")
 
 

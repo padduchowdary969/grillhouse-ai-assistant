@@ -84,9 +84,34 @@ def clean_funnel() -> pd.DataFrame:
     return df.round(2)
 
 
+def clean_reviews() -> pd.DataFrame:
+    df = read("ubereats_reviews_2026.csv")
+    assert (df["rating_type"] == "consumer_to_merchant").all(), "expected only customer ratings of the store"
+    ordered = pd.to_datetime(df["time_customer_ordered"])
+    out = pd.DataFrame({
+        "order_id": df["order_id"],  # short code shown in Uber Eats Manager; internal UUIDs are dropped
+        "ordered_at": ordered.dt.strftime("%Y-%m-%d %H:%M"),
+        "hour": ordered.dt.hour,
+        # Orders before midday belong to the shift that started the previous evening
+        "trading_night": (ordered - pd.Timedelta(hours=12)).dt.strftime("%a"),
+        "delivery_minutes": (pd.to_datetime(df["order_completion_time"]) - ordered).dt.total_seconds().div(60).round(),
+        "rated_on": df["rating_date"],
+        "rating": df["rating_value"].astype(int),
+        # "restaurant_not_tasty, restaurant_too_slow" -> "not tasty; too slow"
+        "tags": df["rating_tags"].fillna("").str.split(",").apply(
+            lambda tags: "; ".join(t.strip().removeprefix("restaurant_").replace("_", " ") for t in tags if t.strip())),
+        # Some comments contain a literal "\n" instead of a line break
+        "comment": df["comment"].fillna("").str.replace(r"\\n|\s+", " ", regex=True).str.strip(),
+        "fulfilment": df["fulfillment_type"].str.lower(),
+        "app": df["order_channel"],
+    })
+    return out.sort_values("ordered_at").reset_index(drop=True)
+
+
 def main() -> None:
     OUT.mkdir(exist_ok=True)
     monthly, items, hourly, funnel = clean_monthly(), clean_items(), clean_hourly(), clean_funnel()
+    reviews = clean_reviews()
 
     # The three sales reports should agree on the same 12 months (Oct 2025 - Sep 2026)
     this_year = monthly[monthly["month"] >= "2025-10"]
@@ -94,7 +119,7 @@ def main() -> None:
     assert this_year["orders"].sum() == hourly["orders"].sum(), "monthly and hourly order counts differ"
     assert abs(items["sales"].sum() / hourly["sales"].sum() - 1) < 0.01, "item sales off by more than 1%"
 
-    for name, df in {"monthly": monthly, "items": items, "hourly": hourly, "funnel": funnel}.items():
+    for name, df in {"monthly": monthly, "items": items, "hourly": hourly, "funnel": funnel, "reviews": reviews}.items():
         path = OUT / f"ubereats_{name}.csv"
         df.to_csv(path, index=False)
         print(f"wrote {path} ({len(df)} rows)")
