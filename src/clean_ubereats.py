@@ -4,11 +4,13 @@ Run from the project root:
     python src/clean_ubereats.py
 """
 
+import os
+import os
 from pathlib import Path
 
 import pandas as pd
 
-DATA = Path("data")
+DATA = Path(os.environ.get("GRILLHOUSE_DATA", "data"))  # set GRILLHOUSE_DATA=sample_data to use the sample files
 OUT = DATA / "clean"
 
 # The shop trades 18:00-08:00, so an order at 04:00 Sunday belongs to Saturday night.

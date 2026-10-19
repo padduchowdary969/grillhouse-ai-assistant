@@ -17,10 +17,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from analyse_ubereats import BLUE, DAYS, GRID, INK, INK_2, MUTED, SHIFT_HOURS, finish, gbp
+from analyse_ubereats import CLEAN, OUT, BLUE, DAYS, GRID, INK, INK_2, MUTED, SHIFT_HOURS, finish, gbp
 
-CLEAN = Path("data/clean")
-OUT = Path("data/reports")
 
 FIRST_SETTLED_MONTH = "2025-10"  # earlier months are the launch ramp-up
 HORIZON = 3  # months ahead

@@ -4,8 +4,12 @@ Run from the project root, after src/clean_ubereats.py:
     python src/analyse_ubereats.py
 
 Everything is written to data/reports/, which stays private (data/ is git-ignored).
+With GRILLHOUSE_DATA=sample_data it reads and writes sample_data/ instead.
+With GRILLHOUSE_DATA=sample_data it reads and writes sample_data/ instead.
 """
 
+import os
+import os
 from pathlib import Path
 
 import matplotlib
@@ -16,8 +20,9 @@ import numpy as np
 import pandas as pd
 from matplotlib.colors import LinearSegmentedColormap
 
-CLEAN = Path("data/clean")
-OUT = Path("data/reports")
+DATA = Path(os.environ.get("GRILLHOUSE_DATA", "data"))  # set GRILLHOUSE_DATA=sample_data to use the sample files
+CLEAN = DATA / "clean"
+OUT = DATA / "reports"
 
 DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 SHIFT_HOURS = list(range(18, 24)) + list(range(0, 11))  # 18:00 through the 10:00 weekend close
@@ -206,8 +211,8 @@ def summary(monthly, items, hourly, funnel) -> str:
     by_hour = hourly.groupby("hour")["orders"].sum()
     outside = hourly[~hourly["within_opening_hours"]]
     weak = items[items["sales"] < 200]
-    momo = items[items["item"].str.contains("momo", case=False)]
-    extras = items[items["item"].str.contains("coke|fanta|pepsi|sprite|water|shake|sauce|mayonnaise", case=False)]
+    bottom = ", ".join(items.tail(3)["item"])
+    extras = items[items["item"].str.contains(r"\b(?:coke|cola|fanta|pepsi|sprite|soda|water|shake|lassi|sauce|mayo)", case=False)]
     f = funnel.set_index("period").loc["this_period"]
     prev = funnel.set_index("period").loc["last_period"]
     top_n = int((items["cumulative_pct"] <= 80).sum()) + 1
@@ -228,7 +233,7 @@ Uber Eats orders only (no walk-in or other platforms).
 ## Menu
 - {len(items)} items sold; the top {top_n} make 80% of sales
 - Best seller: {items.iloc[0]['item']} ({gbp(items.iloc[0]['sales'])}, {items.iloc[0]['pct_of_sales']:.0f}% of sales)
-- {len(weak)} items sold under £200 all year; momos together: {gbp(momo['sales'].sum())}
+- {len(weak)} items sold under £200 all year; weakest sellers: {bottom}
 - Drinks, shakes and sauces: {gbp(extras['sales'].sum())} ({extras['sales'].sum() / items['sales'].sum():.1%} of sales), about {extras['items_sold'].sum() / year['orders'].sum():.2f} per order
 
 ![Top items](2_top_items.png)

@@ -223,3 +223,11 @@ data/
 
 # macOS
 .DS_Store
+
+# Generated from sample_data/ by the scripts
+sample_data/clean/
+sample_data/reports/
+
+# Generated from sample_data/ by the scripts
+sample_data/clean/
+sample_data/reports/

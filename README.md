@@ -1,2 +1,52 @@
 # grillhouse-ai-assistant
 “AI business assistant for a real restaurant: analytics, forecasting, RAG chatbot”
+
+Built for a late-night takeaway (open 18:00–08:00) that sells through Uber Eats. The scripts turn raw
+Uber Eats Manager exports into clean tables, charts, a written summary and a sales forecast.
+
+## Try it with sample data
+
+The real business data is private and never committed. `sample_data/` holds synthetic exports in the
+same layout as real Uber Eats files (made by `src/make_sample_data.py`; every number and review is invented).
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+export GRILLHOUSE_DATA=sample_data
+python src/clean_ubereats.py      # -> sample_data/clean/
+python src/analyse_ubereats.py    # -> sample_data/reports/ubereats_summary.md + charts
+python src/forecast_ubereats.py   # -> sample_data/reports/forecast_summary.md + chart
+```
+
+## Use your own Uber Eats data
+
+Download these reports from Uber Eats Manager for the same date range and save them in `data/`
+(git-ignored), then run the same three scripts without `GRILLHOUSE_DATA`:
+
+| Uber Eats report | Save as |
+|---|---|
+| Sales over time (monthly) | `data/ubereats_monthly_2026.csv` |
+| Sales leaderboard: items | `data/ubereats_items_2026.csv` |
+| Sales by hour | `data/ubereats_sales_by_hour_2026.csv` |
+| User conversion funnel | `data/ubereats_funnel_2026.csv` |
+| Ratings | `data/ubereats_reviews_2026.csv` |
+
+## What each script does
+
+- `src/clean_ubereats.py`: fixes the exports (byte-order marks, float noise, duplicate item spellings),
+  groups after-midnight hours into the night the shift started, and cross-checks totals between reports.
+- `src/analyse_ubereats.py`: monthly trend, top items, a night-by-hour order heatmap, the customer funnel
+  and customer ratings with complaint themes.
+- `src/forecast_ubereats.py`: tests three simple methods on past months, forecasts the next three with the
+  most accurate one (with an 80% range), and spreads each month over a typical week by night and hour.
+- `src/make_sample_data.py`: regenerates the synthetic files in `sample_data/`.
+
+## Roadmap
+
+- [x] Data cleaning
+- [x] Analytics
+- [x] Forecasting
+- [ ] Knowledge base (menu, opening hours, reports)
+- [ ] Chatbot
