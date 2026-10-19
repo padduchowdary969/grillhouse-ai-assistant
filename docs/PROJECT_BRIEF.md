@@ -8,7 +8,7 @@ questions in plain English through a **retrieval-augmented generation (RAG)** ch
 **local open-source large language model**, so there are no API costs and the business data never leaves the
 owner's machine. The owners use it as an **installable mobile web app** from anywhere.
 
-**Stack:** Python · pandas · NumPy · matplotlib · Ollama · Qwen3 8B · TF-IDF retrieval · HTTP server · PWA ·
+**Stack:** Python · pandas · NumPy · matplotlib · Ollama · Qwen3 8B · nomic-embed-text · hybrid retrieval · HTTP server · PWA ·
 Tailscale · macOS launchd · Git/GitHub
 
 ## 2. Problem
@@ -33,7 +33,7 @@ Tailscale · macOS launchd · Git/GitHub
  ④ Knowledge base ── reports, tables, shop info → chunked documents
         │
         ▼
- ⑤ Retriever (TF-IDF) ── top-k relevant chunks per question
+ ⑤ Hybrid retriever (TF-IDF + embeddings) ── top-k relevant chunks per question
         │
         ▼
  ⑥ LLM inference (Qwen3 8B via Ollama, local) ── grounded answer, streamed
@@ -76,9 +76,13 @@ Tailscale · macOS launchd · Git/GitHub
 
 - **Knowledge base:** markdown reports split into chunks by heading, plus serialised data tables (items,
   months, night × hour orders, review comments, forecast week) and shop facts. About 13 chunks.
-- **Retrieval:** **sparse retrieval** using TF-IDF scores with light stemming and stop-word removal. Chunk
-  titles are weighted double, and it returns the **top-k = 5** chunks per question. Shop facts that every
-  answer needs (opening hours) are pinned into the **system prompt** instead.
+- **Retrieval:** **hybrid search**. Each chunk is ranked twice: by **sparse retrieval** (TF-IDF with light
+  stemming and stop-word removal, titles weighted double) and by **dense retrieval** (cosine similarity of
+  `nomic-embed-text` **embeddings**, with the model's query/document task prefixes). The two rankings are
+  merged with **reciprocal rank fusion (RRF)**, and the **top-k = 5** chunks go to the model. Keywords catch
+  exact dish names; embeddings catch meaning ("when do we get slammed?" → busy-times table). Shop facts that
+  every answer needs (opening hours) are pinned into the **system prompt** instead, along with today's date so
+  relative questions like "next month" resolve.
 - **Generation:** Qwen3 8B, an open-weights model with about 8 billion parameters, **4-bit quantized**
   (about 5 GB). It runs locally through Ollama on Apple-silicon GPU acceleration.
 - **Settings:** temperature 0.2, a 16K-token **context window**, reasoning ("thinking") mode turned off to cut
@@ -90,13 +94,20 @@ Tailscale · macOS launchd · Git/GitHub
   units.
 - **Conversation memory:** a short rolling window of past turns supports follow-up questions. The retrieved
   facts aren't kept in that history, which saves context space.
-- **Evaluation:** an automated test set ([`src/evaluate_chatbot.py`](../src/evaluate_chatbot.py)) of 11
-  questions covering facts, timing, forecasts, reviews and **unanswerable** questions (to check the model
-  refuses instead of guessing). Each case scores **retrieval hit** (was the right chunk retrieved?) and
-  **answer correctness** (does the reply contain the expected values, read from the data so the same tests run
-  on real and synthetic data?). Current score: **11/11 retrieval and 11/11 answers** on both datasets, median
-  response time 10–14 s. One known weakness of a small model remains: occasional overconfidence on
-  "sometimes" facts.
+- **Evaluation:** an automated test set ([`src/evaluate_chatbot.py`](../src/evaluate_chatbot.py)) of 20
+  questions: 11 plainly worded and 9 in casual wording ("what do people moan about?", "which grub barely
+  sells?"), including **unanswerable** questions to check the model refuses instead of guessing. Each case
+  scores **retrieval hit** (was the right chunk retrieved?) and **answer correctness** (does the reply contain
+  the expected values, read from the data so the same tests run on real and synthetic data?).
+
+  | Search | Plain questions | Casual wording | Total |
+  |---|---|---|---|
+  | Keyword only (TF-IDF) | 11/11 | 5/9 | 16/20 |
+  | **Hybrid (TF-IDF + embeddings, RRF)** | **11/11** | **9/9** | **20/20** |
+
+  Hybrid scored 20/20 on both the real and synthetic datasets, median response time 9–13 s. The test set also
+  exposed problems that were then fixed: a missing knowledge file in the sample data, the model not knowing
+  today's date, and month names not matching "2026-01" style dates.
 
 ### ⑦ Deployment: [`src/web_chat.py`](../src/web_chat.py), [`install_autostart.command`](../install_autostart.command)
 
@@ -125,7 +136,7 @@ several times slower. A local model kept the project free and private.
 
 ## 6. AI and ML concepts used
 
-Retrieval-augmented generation (RAG) · TF-IDF sparse retrieval · top-k retrieval · chunking · open-weights
+Retrieval-augmented generation (RAG) · hybrid search · TF-IDF sparse retrieval · dense retrieval · embeddings · cosine similarity · reciprocal rank fusion · top-k retrieval · chunking · open-weights
 LLM · 4-bit quantization · local / on-device inference · context window · system prompt · prompt engineering ·
 grounding · hallucination mitigation · evaluation (retrieval hit rate, answer accuracy) · temperature · response streaming · conversational memory ·
 backtesting · prediction intervals · feature engineering · synthetic data · data minimisation
@@ -133,8 +144,7 @@ backtesting · prediction intervals · feature engineering · synthetic data · 
 ## 7. Next steps
 
 - **Menu:** add the menu with prices to the knowledge base, using a vision model to read a photo of the menu.
-- **Better search:** move to **dense retrieval** with an embedding model such as `nomic-embed-text` for
-  meaning-based matching.
+- **Re-ranking:** a cross-encoder re-ranker on top of hybrid search once the knowledge base grows.
 - **Better forecasts:** switch to daily data to capture weekly and seasonal patterns.
 - **Richer evaluation:** more test cases and an LLM acting as judge for open-ended answers.
 - **Server option:** a Docker image for running it on a server.

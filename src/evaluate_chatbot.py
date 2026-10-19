@@ -44,8 +44,12 @@ def build_cases() -> list[dict]:
     top, third = items.iloc[0], items.iloc[2]
     peak_month = monthly.loc[monthly["sales"].idxmax()]
     next_month = forecast.iloc[0]
+    january = monthly.loc[monthly["month"] == "2026-01"].iloc[0]
+    funnel = pd.read_csv(chatbot.CLEAN / "ubereats_funnel.csv").set_index("period").loc["this_period"]
+    avg_rating = pd.read_csv(chatbot.CLEAN / "ubereats_reviews.csv")["rating"].mean()
+    refusal = ["don't have", "do not have", "not available", "no information"]
 
-    return [
+    plain = [
         {"question": "Which item sells the most?", "section": "Menu items",
          "any": [[top["item"]]]},
         {"question": f"How much did {third['item']} sell and what is its average price?", "section": "Menu items",
@@ -61,12 +65,29 @@ def build_cases() -> list[dict]:
         {"question": "What time do we close?", "section": "Opening hours", "must": ["08:00"], "any": [["10:00", "10am"]]},
         {"question": "What do customers complain about?", "section": "Customer", "any": [["cold"], ["portion"]]},
         {"question": "What is our average customer rating?", "section": "Customer ratings",
-         "any": [[f"{pd.read_csv(chatbot.CLEAN / 'ubereats_reviews.csv')['rating'].mean():.2f}"]]},
-        {"question": "How many staff do we employ?", "section": "",
-         "any": [["don't have", "do not have", "not available", "no information"]]},
-        {"question": "What is our phone number?", "section": "",
-         "any": [["don't have", "do not have", "not available", "no information"]], "never": [r"\b0\d{3}"]},
+         "any": [[f"{avg_rating:.2f}"]]},
+        {"question": "How many staff do we employ?", "section": "", "any": [refusal]},
+        {"question": "What is our phone number?", "section": "", "any": [refusal], "never": [r"\b0\d{3}"]},
     ]
+    # Casual wording that shares few words with the data: the hard case for keyword search
+    tricky = [
+        {"question": "When do we get slammed?", "section": ("Orders in a year", "When people order", "Forecast orders"),
+         "any": [day_variants(nights.idxmax())]},
+        {"question": "What's our top dish?", "section": ("Menu",), "any": [[top["item"]]]},
+        {"question": "What do people moan about?", "section": ("Customer",), "any": [["cold"], ["portion"]]},
+        {"question": "How are folks rating us?", "section": ("Customer ratings",), "any": [[f"{avg_rating:.2f}", f"{avg_rating:.1f}"]]},
+        {"question": "How much cash will we take next month?", "section": ("Forecast",),
+         "any": [money_variants(next_month["forecast"])]},
+        {"question": "Which grub barely sells?", "section": ("Menu",), "any": [list(items.tail(5)["item"])]},
+        {"question": "Are people bailing before they order?", "section": ("Funnel",),
+         "any": [[f"{funnel['viewed_your_menu_rate_pct']:.0f}%", f"{100 - funnel['viewed_your_menu_rate_pct']:.0f}%",
+                  f"{funnel['placed_an_order_rate_pct']:.0f}%", f"{100 - funnel['placed_an_order_rate_pct']:.0f}%",
+                  f"{funnel['overall_conversion_pct']:.2f}%"]]},
+        {"question": "How did we do in January?", "section": ("Monthly sales",),
+         "any": [money_variants(january["sales"])]},
+        {"question": "Who's our accountant?", "section": "", "any": [refusal]},
+    ]
+    return [{**c, "set": "plain"} for c in plain] + [{**c, "set": "tricky"} for c in tricky]
 
 
 def check_answer(reply: str, case: dict) -> tuple[bool, str]:
@@ -84,22 +105,24 @@ def main() -> None:
     rows = []
     for case in build_cases():
         titles = [title for title, _ in retriever.search(case["question"])]
-        retrieved = not case["section"] or any(t.startswith(case["section"]) for t in titles)
+        wanted = (case["section"],) if isinstance(case["section"], str) else case["section"]
+        retrieved = not case["section"] or any(t.startswith(w) for t in titles for w in wanted)
         start = time.time()
         reply = chatbot.answer(case["question"], retriever, history=[], stream_to=None)
         seconds = time.time() - start
         correct, why = check_answer(reply, case)
-        rows.append({"question": case["question"], "retrieval_ok": retrieved, "answer_ok": correct,
+        rows.append({"set": case["set"], "question": case["question"], "retrieval_ok": retrieved, "answer_ok": correct,
                      "seconds": round(seconds, 1), "problem": why, "reply": reply.replace("\n", " ")})
         print(f"{'PASS' if correct else 'FAIL'}  {'R' if retrieved else 'r'}  {seconds:5.1f}s  {case['question']}"
               + (f"\n      {why}\n      reply: {reply[:160]}" if not correct else ""))
 
     results = pd.DataFrame(rows)
     results.to_csv(chatbot.REPORTS / "eval_results.csv", index=False)
-    print(f"\nAnswers correct: {results['answer_ok'].sum()}/{len(results)}"
-          f"   Retrieval hit: {results['retrieval_ok'].sum()}/{len(results)}"
-          f"   Median time: {results['seconds'].median():.0f}s"
-          f"\nwrote {chatbot.REPORTS / 'eval_results.csv'}")
+    print(f"\nSearch: {retriever.mode}")
+    for name, group in results.groupby("set", sort=False):
+        print(f"{name:7s} answers {group['answer_ok'].sum()}/{len(group)}   retrieval {group['retrieval_ok'].sum()}/{len(group)}")
+    print(f"total   answers {results['answer_ok'].sum()}/{len(results)}   retrieval {results['retrieval_ok'].sum()}/{len(results)}"
+          f"   median {results['seconds'].median():.0f}s\nwrote {chatbot.REPORTS / 'eval_results.csv'}")
 
 
 if __name__ == "__main__":

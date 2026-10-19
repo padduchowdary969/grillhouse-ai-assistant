@@ -45,22 +45,26 @@ Download these reports from Uber Eats Manager for the same date range and save t
   most accurate one (with an 80% range), and spreads each month over a typical week by night and hour.
 - `src/make_sample_data.py`: regenerates the synthetic files in `sample_data/`.
 - `src/chatbot.py`: answers questions in plain English using a free model that runs locally (see below).
-- `src/evaluate_chatbot.py`: scores the chatbot on 11 test questions (retrieval hit and answer correctness),
-  with expected answers read from the data so it works on real and sample data.
+- `src/evaluate_chatbot.py`: scores the chatbot on 20 test questions (11 plainly worded, 9 in casual wording)
+  for retrieval hit and answer correctness, with expected answers read from the data so it works on real and
+  sample data.
 
 ## Chatbot (free, runs on your computer)
 
 The chatbot uses [Ollama](https://ollama.com) to run an open model locally, so it costs nothing and no
 business data leaves the machine. For each question it retrieves the most relevant sections of the reports,
-tables and `knowledge/*.txt` files (keyword TF-IDF search) and asks the model to answer only from them.
+tables and `knowledge/*.txt` files with **hybrid search** (TF-IDF keywords plus `nomic-embed-text`
+embeddings, merged by reciprocal rank fusion) and asks the model to answer only from them.
 
 ```bash
 ollama pull qwen3:8b                     # once, about 5 GB
+ollama pull nomic-embed-text             # once, about 270 MB (search by meaning)
 python src/chatbot.py                    # chat; type "quit" to stop
 python src/chatbot.py "Which night is busiest?"
 ```
 
-Run the clean, analyse and forecast scripts first. Set `GRILLHOUSE_MODEL` to try another Ollama model.
+Run the clean, analyse and forecast scripts first. Set `GRILLHOUSE_MODEL` to try another Ollama model, or
+`GRILLHOUSE_SEARCH=keyword` to use keyword search only.
 
 ### Chat page and phone app
 
