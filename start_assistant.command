@@ -2,11 +2,18 @@
 # Double-click to start the Grill House assistant. Keeps the Mac awake until this window is closed.
 cd "$(dirname "$0")" || exit 1
 
-if [ ! -f .env ] || ! grep -q '^GRILLHOUSE_PASSWORD=' .env; then
-  echo "First time setup: choose a password for the chat page (at least 8 characters)."
-  read -rs "password?Password: "; echo
-  echo "GRILLHOUSE_PASSWORD=$password" >> .env
+saved=$(grep '^GRILLHOUSE_PASSWORD=' .env 2>/dev/null | head -1 | cut -d= -f2-)
+if [ ${#saved} -lt 8 ]; then
+  echo "Choose a password for the chat page (at least 8 characters). You'll type it to sign in."
+  while true; do
+    read -rs "password?Password: "; echo
+    [ ${#password} -ge 8 ] && break
+    echo "That's ${#password} characters - please use at least 8."
+  done
+  # Replace any old password line, keep everything else in .env
+  { grep -v '^GRILLHOUSE_PASSWORD=' .env 2>/dev/null; echo "GRILLHOUSE_PASSWORD=$password"; } > .env.tmp && mv .env.tmp .env
   chmod 600 .env
+  echo "Password saved."
 fi
 
 open -a Ollama
