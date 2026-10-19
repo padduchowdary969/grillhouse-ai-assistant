@@ -87,7 +87,19 @@ def build_cases() -> list[dict]:
          "any": [money_variants(january["sales"])]},
         {"question": "Who's our accountant?", "section": "", "any": [refusal]},
     ]
-    return [{**c, "set": "plain"} for c in plain] + [{**c, "set": "tricky"} for c in tricky]
+    # Relative dates: answers must be one night (or the 7-night total), never a monthly figure
+    nights_text = chatbot.next_nights_forecast()
+    tonight = re.search(r"Tonight.*?£([\d,]+) from (\d+)", nights_text)
+    week_total = re.search(r"Total.*?£([\d,]+)", nights_text)
+    monthly_figures = [rf"{round(v):,}" for v in forecast["forecast"]]
+    dated = [
+        {"question": "What is the sales forecast for tonight?", "section": "",
+         "any": [[tonight.group(1)]], "never": monthly_figures},
+        {"question": "How many orders will we get tonight?", "section": "", "any": [[tonight.group(2)]], "never": monthly_figures},
+        {"question": "How much will we take this week?", "section": "", "any": [[week_total.group(1)]], "never": monthly_figures},
+    ] if tonight and week_total else []
+    return ([{**c, "set": "plain"} for c in plain] + [{**c, "set": "tricky"} for c in tricky]
+            + [{**c, "set": "dated"} for c in dated])
 
 
 def check_answer(reply: str, case: dict) -> tuple[bool, str]:

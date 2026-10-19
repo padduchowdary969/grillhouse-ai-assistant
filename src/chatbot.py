@@ -13,7 +13,7 @@ import math
 import os
 import re
 import sys
-from datetime import date
+from datetime import date, datetime, timedelta
 import urllib.error
 import urllib.request
 from collections import Counter
@@ -36,7 +36,9 @@ answer, say "I don't have that information" rather than guessing. Use £ for mon
 only (no walk-in or other apps). The shop trades 18:00 to 08:00, so an order at 04:00 on Sunday belongs to
 Saturday night. When the facts include exceptions, mention them; when asked about opening or closing
 times, always give both the usual time and the later weekend time. For tables,
-read the numbers carefully and quote the highest or lowest values exactly. Keep answers short and practical:
+read the numbers carefully and quote the highest or lowest values exactly. Monthly forecast figures cover a
+whole month: never give one as the figure for a single night or day. Sales figures are what customers paid on
+Uber Eats, before Uber's commission and fees, not the payout to the shop. Keep answers short and practical:
 lead with the answer, then the key numbers."""
 
 DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -97,6 +99,33 @@ def build_knowledge() -> list[tuple[str, str]]:
                          "Expected orders in ONE night of a typical week (use this for prep and staffing). Columns are the hour.\n"
                          + grid[order].fillna(0).round(1).rename_axis("night").reset_index().to_csv(index=False).strip()))
     return sections
+
+
+def next_nights_forecast(days: int = 7) -> str:
+    """Forecast for the coming nights with real dates. Built per question, since the server runs for days."""
+    path = REPORTS / "forecast_typical_week.csv"
+    if not path.exists():
+        return ""
+    week = pd.read_csv(path)
+    per_night = week.groupby(["month", "trading_night"])[["sales", "orders"]].sum()
+    now = datetime.now()
+    # Before midday we are still in the shift that started yesterday evening
+    start = (now - timedelta(days=1) if now.hour < 12 else now).date()
+    lines = ["Expected Uber Eats sales and orders for ONE night each (18:00 to closing). Use these for "
+             "\"tonight\", \"tomorrow\" or a named night - never the monthly totals."]
+    total_sales = total_orders = 0.0
+    for offset in range(days):
+        night = start + timedelta(days=offset)
+        month = night.strftime("%Y-%m")
+        month = month if month in per_night.index.get_level_values(0) else per_night.index.get_level_values(0)[0]
+        row = per_night.loc[(month, night.strftime("%a"))]
+        label = "Tonight" if offset == 0 else "Tomorrow night" if offset == 1 else f"{night:%A} night"
+        lines.append(f"- {label}, {night:%A %d %B %Y}: about £{row['sales']:,.0f} from {row['orders']:.0f} orders")
+        total_sales += row["sales"]
+        total_orders += row["orders"]
+    # Small models add up badly, so give the week's total ready-made
+    lines.append(f"- Total for these {days} nights (this week): about £{total_sales:,.0f} from {total_orders:.0f} orders")
+    return "\n".join(lines)
 
 
 # ---------- retrieval ----------
@@ -194,6 +223,9 @@ def answer(question: str, retriever: Retriever, history: list[dict], stream_to=s
     # Always-on facts (opening hours) go in the instructions, where a small model is less likely to skip them
     always = "\n\n".join(body for title, body in found if title in ALWAYS_INCLUDE)
     facts = "\n\n".join(f"### {title}\n{body}" for title, body in found if title not in ALWAYS_INCLUDE)
+    nights = next_nights_forecast()
+    if nights:
+        facts = f"### Forecast for the next 7 nights (tonight, tomorrow, this week)\n{nights}\n\n{facts}"
     # The model doesn't know the date, so "next month" or "January" would otherwise be ambiguous
     system = (SYSTEM_PROMPT + f"\n\nToday is {date.today():%A %d %B %Y}. Months in the tables are written YYYY-MM"
               " (2026-01 means January 2026); \"next month\" means the first month in the forecast."
