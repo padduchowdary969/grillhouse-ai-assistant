@@ -4,6 +4,8 @@
 Built for a late-night takeaway (open 18:00–08:00) that sells through Uber Eats. The scripts turn raw
 Uber Eats Manager exports into clean tables, charts, a written summary and a sales forecast.
 
+**[Read the project brief](docs/PROJECT_BRIEF.md)** for the architecture, AI techniques and deployment.
+
 ## Try it with sample data
 
 The real business data is private and never committed. `sample_data/` holds synthetic exports in the
