@@ -58,13 +58,18 @@ python src/chatbot.py "Which night is busiest?"
 
 Run the clean, analyse and forecast scripts first. Set `GRILLHOUSE_MODEL` to try another Ollama model.
 
-### Chat page
+### Chat page and phone app
 
-`src/web_chat.py` serves a password-protected chat page at http://localhost:8501. On a Mac, double-click
-`start_assistant.command`: it asks for a password the first time (stored in the git-ignored `.env`), starts
-Ollama, keeps the Mac awake and opens the page. Other devices can use it from anywhere through
-[Tailscale](https://tailscale.com); the server refuses connections from any network other than this computer
-and the Tailscale network.
+`src/web_chat.py` serves a password-protected chat page at http://localhost:8501 that can be installed on a
+phone's home screen like an app. On a Mac:
+
+1. Double-click `start_assistant.command` once to choose the password (stored in the git-ignored `.env`).
+2. Double-click `install_autostart.command` so the assistant starts at login, restarts if it stops and keeps
+   the Mac awake on power (`./install_autostart.command remove` undoes it).
+3. With [Tailscale](https://tailscale.com) installed, run `tailscale serve --bg 8501` once. Devices on your
+   tailnet then open `https://<your-mac>.<tailnet>.ts.net` and choose "Add to Home Screen".
+
+The server listens only on this computer; Tailscale Serve is the only way in from other devices.
 
 ## Roadmap
 
@@ -75,3 +80,4 @@ and the Tailscale network.
 - [x] Chatbot (command line, local model)
 - [ ] Menu with prices in the knowledge base
 - [x] Chat window (web page, password, Tailscale access)
+- [x] Installable phone app (home-screen web app) and auto-start

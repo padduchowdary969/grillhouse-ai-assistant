@@ -51,6 +51,14 @@ PAGE = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Grill House Assistant</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/static/icon-192.png">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<meta name="theme-color" content="#c2410c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Grill House">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>
   :root {
     --bg: #f6f5f2; --surface: #ffffff; --ink: #1b1b19; --muted: #6b6a66; --line: #e3e1db;
@@ -66,7 +74,7 @@ PAGE = """<!doctype html>
   html, body { height: 100%; margin: 0; }
   body { background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
          display: flex; flex-direction: column; }
-  header { padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--surface);
+  header { padding: calc(14px + env(safe-area-inset-top)) 16px 14px; border-bottom: 1px solid var(--line); background: var(--surface);
            display: flex; align-items: baseline; gap: 10px; }
   header h1 { font-size: 17px; margin: 0; }
   header span { color: var(--muted); font-size: 13px; }
@@ -175,10 +183,23 @@ function showChat() {
 }
 
 fetch("/session").then(r => r.ok ? showChat() : showLogin());
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 </script>
 </body>
 </html>
 """
+
+
+STATIC = Path(__file__).parent / "static"
+MANIFEST = json.dumps({
+    "name": "Grill House Assistant", "short_name": "Grill House", "start_url": "/", "scope": "/",
+    "display": "standalone", "background_color": "#f6f5f2", "theme_color": "#c2410c",
+    "icons": [{"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},
+              {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"},
+              {"src": "/static/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}],
+}).encode()
+# Answers need the Mac, so the service worker only makes the page installable; it never caches
+SERVICE_WORKER = b"self.addEventListener('fetch', () => {});"
 
 
 class StreamWriter:
@@ -229,10 +250,26 @@ class Handler(BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             return {}
 
+    def send_bytes(self, body: bytes, content_type: str, cache: str = "no-cache") -> None:
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", cache)
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
         if not self.allowed():
             return
-        if self.path == "/":
+        path = self.path.split("?")[0]
+        static_file = STATIC / path.removeprefix("/static/")
+        if path == "/manifest.webmanifest":
+            self.send_bytes(MANIFEST, "application/manifest+json")
+        elif path == "/sw.js":
+            self.send_bytes(SERVICE_WORKER, "text/javascript")
+        elif path.startswith("/static/") and static_file.suffix == ".png" and static_file.parent == STATIC and static_file.exists():
+            self.send_bytes(static_file.read_bytes(), "image/png", "max-age=86400")
+        elif path == "/":
             body = PAGE.encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")

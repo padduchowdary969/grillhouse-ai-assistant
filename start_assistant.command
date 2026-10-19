@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Double-click to start the Grill House assistant. Keeps the Mac awake until this window is closed.
+# Double-click to start the Grill House assistant (or just open it, if auto-start is already running it).
 cd "$(dirname "$0")" || exit 1
 
 saved=$(grep '^GRILLHOUSE_PASSWORD=' .env 2>/dev/null | head -1 | cut -d= -f2-)
@@ -16,6 +16,12 @@ if [ ${#saved} -lt 8 ]; then
   echo "Password saved."
 fi
 
+if curl -s -o /dev/null --max-time 2 http://localhost:8501/; then
+  echo "The assistant is already running. Opening it..."
+  open http://localhost:8501
+  exit 0
+fi
+
 open -a Ollama
 echo "Starting the AI model..."
 curl -s --retry 20 --retry-connrefused --retry-delay 2 -o /dev/null http://localhost:11434/api/version || {
@@ -23,6 +29,6 @@ curl -s --retry 20 --retry-connrefused --retry-delay 2 -o /dev/null http://local
 
 ( curl -s --retry 20 --retry-connrefused --retry-delay 1 -o /dev/null http://localhost:8501/ && open http://localhost:8501 ) &
 
-# 0.0.0.0 lets devices on your Tailscale network connect; the app refuses every other network
-GRILLHOUSE_HOST=0.0.0.0 caffeinate -i .venv/bin/python src/web_chat.py
+# Listens on this Mac only; phones reach it through "tailscale serve" (see README). Keeps the Mac awake until closed.
+caffeinate -is .venv/bin/python src/web_chat.py
 echo "Assistant stopped. You can close this window."
