@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_DB: grillhouse
+          POSTGRES_USER: grillhouse
+          POSTGRES_PASSWORD: ci-owner-password
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U grillhouse -d grillhouse"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      POSTGRES_PASSWORD: ci-owner-password
+      GRILLHOUSE_READONLY_PASSWORD: ci-readonly-password
+      GRILLHOUSE_PASSWORD: ci-chat-password
+      GRILLHOUSE_JWT_SECRET: ci-jwt-secret-not-for-production
+      DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+      GIT_PYTHON_REFRESH: quiet
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Create database roles and schemas
+        env:
+          PGHOST: localhost
+          PGPORT: "5433"
+          PGPASSWORD: ci-owner-password
+          POSTGRES_USER: grillhouse
+          POSTGRES_DB: grillhouse
+        run: bash db/init/01_roles.sh
+
+      - name: Build demo data (seed -> clean -> database -> dbt tests -> forecast)
+        run: python -m pipelines.run_all
+
+      - name: Synthetic data matches the committed copy
+        run: git diff --exit-code --stat -- seed_data/
+
+      - name: Tests
+        run: python -m pytest

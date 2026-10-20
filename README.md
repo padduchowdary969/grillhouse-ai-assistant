@@ -1,4 +1,6 @@
 # grillhouse-ai-assistant
+
+[![CI](https://github.com/padduchowdary969/grillhouse-ai-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/padduchowdary969/grillhouse-ai-assistant/actions/workflows/ci.yml)
 “AI business assistant for a real restaurant: analytics, forecasting, RAG chatbot”
 
 Built for a late-night takeaway (open 18:00–08:00) that sells through Uber Eats. The scripts turn raw
@@ -25,7 +27,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 docker compose up -d db                 # database only
 python -m pipelines.run_all             # seed data -> clean -> reports -> database -> dbt
-python -m pytest                        # 29 tests
+python -m pytest                        # 74 tests
 ```
 
 ### Repository layout
@@ -55,6 +57,46 @@ data/        the shop's real exports (git-ignored, private)
 
 The copilot connects as `copilot_readonly`: it can only `SELECT` from `analytics`, can't see `raw`, runs in
 read-only transactions and is cut off after 5 seconds.
+
+## Copilot API (Phase 2, in progress)
+
+```bash
+uvicorn app.api:app --port 8000          # interactive docs at http://localhost:8000/docs
+```
+
+| Endpoint | What it does |
+|---|---|
+| `POST /auth/token` | Sign in; returns a JWT carrying the role (owner or staff) |
+| `POST /ask/sql` | Text-to-SQL: question → validated query → answer, with the SQL shown (rate-limited) |
+| `POST /search` | Menu and policy search (pgvector + BM25, reciprocal rank fusion) with citations |
+| `POST /sql` | Run a validated read-only query directly (owners only) |
+| `GET /health` | Database check |
+
+Every query is parsed with sqlglot and must be a single `SELECT` over the six analytics tables (no system
+tables, no `pg_*` functions, no writes hidden in CTEs, 200-row cap), and then runs as the read-only database user.
+
+### Evaluation so far
+
+| What | Score |
+|---|---|
+| Text-to-SQL golden set (20 questions, execution match), local Qwen3 8B | 13/20 (65%) |
+| Text-to-SQL, Claude via Bedrock | pending AWS setup |
+| RAG chatbot (23 questions), hybrid search | 23/23 on real and synthetic data |
+| RAG chatbot, keyword search only | 16/20 on the plain + casual sets |
+
+### Demand forecast
+
+`pipelines/forecast_demand.py` forecasts orders for the next 7 nights with LightGBM, backtested over 8 weeks
+(rolling origin) and tracked in MLflow, then converts the forecast into buns and patties to order.
+
+| Model | Mean abs. error (orders/night) | On rainy, event and bank-holiday nights |
+|---|---|---|
+| LightGBM | **3.52** | **3.13** |
+| Same night, 4-week average | 3.58 | 3.41 |
+| Same night last week | 4.57 | 4.18 |
+
+Pure chance (Poisson noise at ~16 orders a night) accounts for about 3.26, so on ordinary nights the strong
+models are near the limit; LightGBM's gain comes from weather and calendar context.
 
 ## Use your own Uber Eats data
 

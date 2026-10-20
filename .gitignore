@@ -232,3 +232,9 @@ seed_data/reports/
 dbt/target/
 dbt/logs/
 dbt/.user.yml
+
+# API request logs
+logs/
+
+# MLflow tracking (local)
+mlruns/

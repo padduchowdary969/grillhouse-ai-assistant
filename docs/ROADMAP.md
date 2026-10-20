@@ -59,14 +59,16 @@ the read-only copilot user and its limits were set up here, ahead of Phase 2.
 
 ## Phase 2: Q&A and search → public demo (weeks 3–4)
 
-- [ ] FastAPI backend (auth, rate limits, request logging); the PWA moves onto it
+- [~] FastAPI backend: JWT with roles, per-user rate limits, request logging ✓; the PWA moving onto it is next
 - [ ] Claude via Bedrock: client, model routing stub, cost and latency logging per request
-- [ ] Text-to-SQL tool: read-only database user, SQL allowlist (SELECT only, no system tables), query
-      validation, exact-match checks in evals
-- [ ] Retriever on pgvector + BM25 with re-ranking and citations; menu and policy documents
-- [ ] LightGBM demand forecaster on daily synthetic data, backtested against the current baselines, tracked in
-      MLflow
-- [ ] Golden set to 50+ questions; GitHub Actions runs evals and blocks merges when scores drop
+- [x] Text-to-SQL tool: read-only database user, SQL allowlist (SELECT only, no system tables), query
+      validation, exact-match checks in evals (20-question golden set; local Qwen3 8B: 13/20)
+- [x] Retriever on pgvector + BM25 with citations (RRF fusion); menu and policy documents. Cross-encoder
+      re-ranking deferred until the corpus grows
+- [x] LightGBM demand forecaster on daily synthetic data, backtested against the current baselines, tracked in
+      MLflow (MAE 3.52 vs 3.58 baseline; 3.13 vs 3.41 on unusual nights; noise floor 3.26)
+- [~] Golden set: 43 questions so far (20 SQL + 23 RAG). GitHub Actions runs the pipeline, dbt tests and
+      pytest on every push ✓; model evals join CI with Bedrock
 - [ ] Public demo on synthetic data (Hugging Face Spaces or Render) with a spending cap and rate limit
 
 **Gate: demo-ready — answers real questions publicly.**

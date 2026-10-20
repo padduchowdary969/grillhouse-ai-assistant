@@ -19,20 +19,25 @@ STEPS = [
     ("Forecast", [sys.executable, "-m", "pipelines.forecast_ubereats"]),
     ("Load database", [sys.executable, "-m", "pipelines.load_db"]),
     ("dbt models + tests", [sys.executable, "-m", "dbt.cli.main", "build", "--project-dir", "dbt", "--profiles-dir", "dbt"]),
+    ("Demand forecast (LightGBM)", [sys.executable, "-m", "pipelines.forecast_demand"]),
 ]
-DB_STEPS = {"Load database", "dbt models + tests"}
+DB_STEPS = {"Load database", "dbt models + tests", "Demand forecast (LightGBM)"}
 
 
 def main() -> None:
     from app import config  # noqa: F401  loads .env so dbt sees the database password
 
-    env = {**os.environ, "GRILLHOUSE_DATA": "seed_data", "DBT_SEND_ANONYMOUS_USAGE_STATS": "false"}
+    env = {**os.environ, "GRILLHOUSE_DATA": "seed_data", "DBT_SEND_ANONYMOUS_USAGE_STATS": "false",
+           "GIT_PYTHON_REFRESH": "quiet"}
     skip_db = "--no-db" in sys.argv
     for name, command in STEPS:
         if skip_db and name in DB_STEPS:
             continue
         start = time.time()
         result = subprocess.run(command, env=env, capture_output=True, text=True)
+        if result.returncode and "libomp" in result.stderr:
+            print(f"skip   {name}: LightGBM needs OpenMP on macOS (brew install libomp)")
+            continue
         status = "ok" if result.returncode == 0 else "FAILED"
         print(f"{status:6s} {name} ({time.time() - start:.1f}s)")
         if result.returncode:
