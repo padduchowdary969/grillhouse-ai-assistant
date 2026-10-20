@@ -67,7 +67,7 @@ def index(folder: Path, cur: psycopg.Cursor) -> int:
     return len(chunks)
 
 
-def search(question: str, k: int = 4) -> list[Hit]:
+def search(question: str, k: int = 4, dense: bool = True) -> list[Hit]:
     with psycopg.connect(db_url(readonly=True), connect_timeout=5) as conn:
         rows = conn.execute("SELECT id, source, heading, content, embedding IS NOT NULL FROM analytics.documents").fetchall()
         if not rows:
@@ -83,7 +83,7 @@ def search(question: str, k: int = 4) -> list[Hit]:
 
         # Meaning: cosine distance in pgvector, when embeddings exist and the model is reachable
         by_meaning = []
-        if any(r[4] for r in rows):
+        if dense and any(r[4] for r in rows):
             try:
                 query_vector = str(embed([f"search_query: {question}"])[0])
                 by_meaning = [r[0] for r in conn.execute(

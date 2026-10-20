@@ -27,7 +27,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 docker compose up -d db                 # database only
 python -m pipelines.run_all             # seed data -> clean -> reports -> database -> dbt
-python -m pytest                        # 74 tests
+python -m pytest                        # 81 tests
 ```
 
 ### Repository layout
@@ -67,6 +67,7 @@ uvicorn app.api:app --port 8000          # interactive docs at http://localhost:
 | Endpoint | What it does |
 |---|---|
 | `POST /auth/token` | Sign in; returns a JWT carrying the role (owner or staff) |
+| `POST /chat` | RAG assistant over the reports, streamed (used by the phone app) |
 | `POST /ask/sql` | Text-to-SQL: question → validated query → answer, with the SQL shown (rate-limited) |
 | `POST /search` | Menu and policy search (pgvector + BM25, reciprocal rank fusion) with citations |
 | `POST /sql` | Run a validated read-only query directly (owners only) |
@@ -79,10 +80,12 @@ tables, no `pg_*` functions, no writes hidden in CTEs, 200-row cap), and then ru
 
 | What | Score |
 |---|---|
-| Text-to-SQL golden set (20 questions, execution match), local Qwen3 8B | 13/20 (65%) |
+| Text-to-SQL golden set (50 questions, execution match), local Qwen3 8B | 33/50 (66%) |
 | Text-to-SQL, Claude via Bedrock | pending AWS setup |
 | RAG chatbot (23 questions), hybrid search | 23/23 on real and synthetic data |
 | RAG chatbot, keyword search only | 16/20 on the plain + casual sets |
+| Document search (20 questions), hybrid | hit@1 1.00, MRR 1.00 |
+| Document search, keyword only (gated in CI) | hit@1 0.90, hit@3 1.00 |
 
 ### Demand forecast
 
@@ -149,16 +152,19 @@ Run the clean, analyse and forecast scripts first. Set `GRILLHOUSE_MODEL` to try
 
 ### Chat page and phone app
 
-`ui/web_chat.py` serves a password-protected chat page at http://localhost:8501 that can be installed on a
-phone's home screen like an app. On a Mac:
+The FastAPI app (`app/api.py`) serves the chat page from `ui/static/` at `/`. It can be installed on a phone's
+home screen like an app, signs in with an HttpOnly session cookie (a JWT, 30 days) and streams answers from
+`POST /chat`. On a Mac:
 
 1. Double-click `start_assistant.command` once to choose the password (stored in the git-ignored `.env`).
-2. Double-click `install_autostart.command` so the assistant starts at login, restarts if it stops and keeps
-   the Mac awake on power (`./install_autostart.command remove` undoes it).
+2. Double-click `install_autostart.command` so the assistant starts at login on port 8501, restarts if it stops
+   and keeps the Mac awake on power (`./install_autostart.command remove` undoes it).
 3. With [Tailscale](https://tailscale.com) installed, run `tailscale serve --bg 8501` once. Devices on your
    tailnet then open `https://<your-mac>.<tailnet>.ts.net` and choose "Add to Home Screen".
 
-The server listens only on this computer; Tailscale Serve is the only way in from other devices.
+In this private mode (`GRILLHOUSE_ALLOWED_NETWORKS=private`) the server listens only on this computer and refuses
+any address outside it and the Tailscale network. Sign-in locks after 10 wrong passwords until restart.
+`ui/web_chat.py` is the previous standalone server, kept as a fallback for now.
 
 ## Roadmap
 

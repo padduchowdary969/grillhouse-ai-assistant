@@ -18,3 +18,33 @@
 {"id": "avg_rating_late", "question": "What is the average rating for late deliveries compared with on-time ones?", "sql": "SELECT o.is_late, round(avg(r.rating), 2) AS avg_rating FROM reviews r JOIN orders o USING (order_id) WHERE o.channel = 'delivery' GROUP BY 1 ORDER BY 1"}
 {"id": "event_nights", "question": "What was the average number of orders on event nights versus nights without an event?", "sql": "SELECT event IS NOT NULL AS is_event, round(avg(orders), 1) AS avg_orders FROM daily_sales GROUP BY 1 ORDER BY 1"}
 {"id": "fries_qty_aug", "question": "How many loaded fries were sold in August 2026 in total?", "sql": "SELECT sum(quantity) AS quantity FROM item_sales_monthly WHERE month = '2026-08-01' AND category = 'Loaded fries'"}
+{"id": "orders_sep_2026", "question": "How many completed orders were there in September 2026?", "sql": "SELECT count(*) FROM orders WHERE status = 'completed' AND trading_night >= '2026-09-01' AND trading_night < '2026-10-01'"}
+{"id": "sales_last_month", "question": "What were total sales last month?", "sql": "SELECT round(sum(sales), 2) FROM daily_sales WHERE trading_night >= '2026-09-01' AND trading_night < '2026-10-01'"}
+{"id": "best_night_ever", "question": "Which single night had the most orders?", "sql": "SELECT trading_night FROM daily_sales ORDER BY orders DESC, trading_night LIMIT 1"}
+{"id": "zero_order_nights", "question": "How many nights had no orders at all?", "sql": "SELECT count(*) FROM daily_sales WHERE orders = 0"}
+{"id": "monthly_orders_2026", "question": "How many orders were there in each month of 2026?", "sql": "SELECT date_trunc('month', trading_night)::date AS month, sum(orders) FROM daily_sales WHERE trading_night >= '2026-01-01' GROUP BY 1 ORDER BY 1"}
+{"id": "top_item_overall", "question": "Which menu item has brought in the most sales overall?", "sql": "SELECT item FROM item_sales_monthly GROUP BY item ORDER BY sum(sales) DESC LIMIT 1"}
+{"id": "category_sales", "question": "What were total sales by menu category, highest first?", "sql": "SELECT category, round(sum(sales), 2) FROM item_sales_monthly GROUP BY 1 ORDER BY 2 DESC"}
+{"id": "drinks_share", "question": "What percentage of all sales came from drinks?", "sql": "SELECT round(100.0 * sum(sales) FILTER (WHERE category = 'Drinks') / sum(sales), 2) FROM item_sales_monthly"}
+{"id": "avg_items_per_order", "question": "On average, how many items are in a completed order?", "sql": "SELECT round(avg(items), 2) FROM orders WHERE status = 'completed'"}
+{"id": "biggest_order", "question": "What was the largest single order total?", "sql": "SELECT max(total) FROM orders WHERE status = 'completed'"}
+{"id": "busiest_hour", "question": "Which hour of the night gets the most orders?", "sql": "SELECT hour FROM orders WHERE status = 'completed' GROUP BY hour ORDER BY count(*) DESC LIMIT 1"}
+{"id": "orders_before_midnight", "question": "What percentage of completed orders are placed before midnight?", "sql": "SELECT round(100.0 * avg(CASE WHEN hour >= 12 THEN 1 ELSE 0 END), 1) FROM orders WHERE status = 'completed'"}
+{"id": "late_rate_overall", "question": "What percentage of completed deliveries arrived late?", "sql": "SELECT round(100.0 * avg(CASE WHEN is_late THEN 1 ELSE 0 END), 1) FROM orders WHERE channel = 'delivery' AND status = 'completed'"}
+{"id": "avg_minutes_late_rain", "question": "How many minutes late are deliveries on average on rainy nights compared with dry nights?", "sql": "SELECT d.is_rainy, round(avg(o.minutes_late), 1) FROM orders o JOIN daily_sales d USING (trading_night) WHERE o.channel = 'delivery' AND o.status = 'completed' AND d.is_rainy IS NOT NULL GROUP BY 1 ORDER BY 1"}
+{"id": "worst_late_night", "question": "Which night had the most late deliveries?", "sql": "SELECT trading_night FROM daily_sales ORDER BY late_deliveries DESC, trading_night LIMIT 1"}
+{"id": "shortage_nights", "question": "How many nights had a courier shortage?", "sql": "SELECT count(*) FROM daily_sales WHERE courier_shortage"}
+{"id": "cancelled_late_reason", "question": "How many cancelled orders were there for each delay reason?", "sql": "SELECT delay_reason, count(*) FROM orders WHERE status = 'cancelled' GROUP BY 1 ORDER BY 2 DESC"}
+{"id": "bank_holiday_orders", "question": "Do bank holiday nights get more orders on average than other nights?", "sql": "SELECT is_bank_holiday, round(avg(orders), 1) FROM daily_sales WHERE trading_night >= '2025-10-01' GROUP BY 1 ORDER BY 1"}
+{"id": "christmas_day", "question": "How many orders were there on Christmas night 2025?", "sql": "SELECT orders FROM daily_sales WHERE trading_night = '2025-12-25'"}
+{"id": "event_list", "question": "Which events happened, and how many nights did each last?", "sql": "SELECT event, count(*) FROM daily_sales WHERE event IS NOT NULL GROUP BY 1 ORDER BY 1"}
+{"id": "freshers_orders", "question": "What was the average number of orders per night during university freshers week?", "sql": "SELECT round(avg(orders), 1) FROM daily_sales WHERE event = 'University freshers week'"}
+{"id": "hot_nights", "question": "How many orders does an average night get when the temperature reaches 24C or more?", "sql": "SELECT round(avg(orders), 1) FROM daily_sales WHERE temp_max_c >= 24"}
+{"id": "rating_distribution", "question": "How many reviews were there for each star rating?", "sql": "SELECT rating, count(*) FROM reviews GROUP BY 1 ORDER BY 1"}
+{"id": "avg_rating_overall", "question": "What is the average customer rating?", "sql": "SELECT round(avg(rating), 2) FROM reviews"}
+{"id": "low_ratings_count", "question": "How many reviews gave 1 or 2 stars?", "sql": "SELECT count(*) FROM reviews WHERE rating <= 2"}
+{"id": "cheapest_burger", "question": "What is the cheapest burger on the menu?", "sql": "SELECT item FROM menu_items WHERE category = 'Burgers' ORDER BY price, item LIMIT 1"}
+{"id": "menu_price_by_category", "question": "What is the average menu price in each category?", "sql": "SELECT category, round(avg(price), 2) FROM menu_items GROUP BY 1 ORDER BY 1"}
+{"id": "sesame_items", "question": "Which items contain sesame?", "sql": "SELECT item FROM menu_items WHERE allergens ILIKE '%sesame%' ORDER BY item"}
+{"id": "vegetarian_count", "question": "How many menu items are vegetarian or vegan?", "sql": "SELECT count(*) FROM menu_items WHERE dietary_tags ILIKE '%vegetarian%' OR dietary_tags ILIKE '%vegan%'"}
+{"id": "pickup_vs_delivery_value", "question": "What is the average order value for pickup versus delivery?", "sql": "SELECT channel, round(avg(total), 2) FROM orders WHERE status = 'completed' GROUP BY 1 ORDER BY 1"}

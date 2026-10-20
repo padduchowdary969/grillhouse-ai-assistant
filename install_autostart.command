@@ -32,7 +32,7 @@ cat > "$PLIST" <<EOF
   <key>ProgramArguments</key>
   <array>
     <string>/bin/zsh</string><string>-c</string>
-    <string>open -g -a Ollama; exec /usr/bin/caffeinate -is "$PROJECT/.venv/bin/python" -m ui.web_chat</string>
+    <string>open -g -a Ollama; GRILLHOUSE_ALLOWED_NETWORKS=private exec /usr/bin/caffeinate -is "$PROJECT/.venv/bin/python" -m uvicorn app.api:app --host 127.0.0.1 --port 8501 --log-level warning</string>
   </array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>

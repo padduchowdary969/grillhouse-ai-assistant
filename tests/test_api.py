@@ -85,3 +85,51 @@ def test_owner_can_run_validated_sql(client, database):
 def test_search_returns_citations(client, database):
     hits = client.post("/search", json={"question": "Is the chicken halal?"}, headers=token(client, OWNER)).json()["hits"]
     assert hits[0]["citation"] == "policies.md › Halal"
+
+
+# ---------- phone app ----------
+
+def test_phone_app_cookie_sign_in(client):
+    assert client.get("/session").status_code == 401
+    response = client.post("/login", json={"password": OWNER})
+    assert response.status_code == 200
+    cookie = response.headers["set-cookie"]
+    assert "HttpOnly" in cookie and "SameSite=strict" in cookie.replace("samesite", "SameSite")
+    assert client.get("/session").json() == {"role": "owner"}
+
+
+def test_lockout_after_repeated_wrong_passwords(client, monkeypatch):
+    monkeypatch.setitem(api.failed_logins, "count", 0)
+    monkeypatch.setattr(api, "MAX_FAILED_LOGINS", 3)
+    for _ in range(3):
+        assert client.post("/login", json={"password": "wrong-guess"}).status_code == 401
+    assert client.post("/login", json={"password": OWNER}).status_code == 429  # even the right one, until restart
+
+
+def test_chat_streams_and_keeps_history_per_session(client, monkeypatch):
+    def fake_answer(question, retriever, history, stream_to):
+        stream_to.write("Saturday ")
+        stream_to.write("is busiest.")
+        history.append(question)
+
+    monkeypatch.setattr(api.chatbot, "answer", fake_answer)
+    monkeypatch.setattr(api, "retriever", lambda: None)
+    client.post("/login", json={"password": OWNER})
+    assert client.post("/chat", json={"question": "Which night is busiest?"}).text == "Saturday is busiest."
+    assert list(api.chat_histories.values())[-1] == ["Which night is busiest?"]
+
+
+def test_app_files_are_served(client):
+    assert "Grill House Assistant" in client.get("/").text
+    assert client.get("/manifest.webmanifest").json()["short_name"] == "Grill House"
+    assert client.get("/static/icon-192.png").headers["content-type"] == "image/png"
+    assert client.get("/static/..%2Fapi.py").status_code == 404
+    assert client.get("/static/index.html").status_code == 404  # only icons from /static
+
+
+def test_private_network_mode(client, monkeypatch):
+    import ipaddress
+    monkeypatch.setattr(api, "ALLOWED_NETWORKS", [ipaddress.ip_network("100.64.0.0/10")])
+    assert client.get("/").status_code == 403  # TestClient's address isn't on the allowlist
+    monkeypatch.setattr(api, "ALLOWED_NETWORKS", [])  # public mode: any network
+    assert client.get("/").status_code == 200

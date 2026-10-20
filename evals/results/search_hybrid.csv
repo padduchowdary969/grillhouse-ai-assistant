@@ -1,0 +1,21 @@
+question,expected,rank,top
+Is the chicken halal?,policies.md › Halal,1,policies.md › Halal
+Do you use pork?,policies.md › Halal,1,policies.md › Halal
+Can coeliacs eat the fries?,policies.md › Allergens,1,policies.md › Allergens
+Is everything cooked in the same fryer?,policies.md › Allergens,1,policies.md › Allergens
+Which burgers contain sesame?,menu.md › Burgers,1,menu.md › Burgers
+What vegan sides do you have?,menu.md › Sides,1,menu.md › Sides
+How hot are the Hot Honey Wings?,menu.md › Chicken,1,menu.md › Chicken
+How much is a chocolate shake?,menu.md › Desserts,1,menu.md › Desserts
+What drinks can I order?,menu.md › Drinks,1,menu.md › Drinks
+Which loaded fries are vegetarian?,menu.md › Loaded fries,1,menu.md › Loaded fries
+Do you have dips or sauces?,menu.md › Sauces,1,menu.md › Sauces
+"A customer says their food arrived cold, what do we do?",policies.md › Refunds and complaints,1,policies.md › Refunds and complaints
+Customer reports a missing item,policies.md › Refunds and complaints,1,policies.md › Refunds and complaints
+When do the buns get delivered?,policies.md › Supplier terms,1,policies.md › Supplier terms
+What is the minimum order for the butcher?,policies.md › Supplier terms,1,policies.md › Supplier terms
+How far do you deliver?,policies.md › Delivery area and times,1,policies.md › Delivery area and times
+Why are delivery times longer when it rains?,policies.md › Delivery area and times,1,policies.md › Delivery area and times
+What time do you close on Sunday morning?,opening_hours.txt,1,opening_hours.txt
+Are you open at 7pm?,opening_hours.txt,1,opening_hours.txt
+Is there anything for someone who can't eat dairy in the wraps?,menu.md › Wraps,1,menu.md › Wraps

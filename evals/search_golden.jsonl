@@ -1,0 +1,20 @@
+{"question": "Is the chicken halal?", "expected": ["policies.md › Halal"]}
+{"question": "Do you use pork?", "expected": ["policies.md › Halal"]}
+{"question": "Can coeliacs eat the fries?", "expected": ["policies.md › Allergens"]}
+{"question": "Is everything cooked in the same fryer?", "expected": ["policies.md › Allergens"]}
+{"question": "Which burgers contain sesame?", "expected": ["menu.md › Burgers"]}
+{"question": "What vegan sides do you have?", "expected": ["menu.md › Sides"]}
+{"question": "How hot are the Hot Honey Wings?", "expected": ["menu.md › Chicken"]}
+{"question": "How much is a chocolate shake?", "expected": ["menu.md › Desserts"]}
+{"question": "What drinks can I order?", "expected": ["menu.md › Drinks"]}
+{"question": "Which loaded fries are vegetarian?", "expected": ["menu.md › Loaded fries"]}
+{"question": "Do you have dips or sauces?", "expected": ["menu.md › Sauces"]}
+{"question": "A customer says their food arrived cold, what do we do?", "expected": ["policies.md › Refunds and complaints"]}
+{"question": "Customer reports a missing item", "expected": ["policies.md › Refunds and complaints"]}
+{"question": "When do the buns get delivered?", "expected": ["policies.md › Supplier terms"]}
+{"question": "What is the minimum order for the butcher?", "expected": ["policies.md › Supplier terms"]}
+{"question": "How far do you deliver?", "expected": ["policies.md › Delivery area and times"]}
+{"question": "Why are delivery times longer when it rains?", "expected": ["policies.md › Delivery area and times"]}
+{"question": "What time do you close on Sunday morning?", "expected": ["opening_hours.txt"]}
+{"question": "Are you open at 7pm?", "expected": ["opening_hours.txt"]}
+{"question": "Is there anything for someone who can't eat dairy in the wraps?", "expected": ["menu.md › Wraps"]}
