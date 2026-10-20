@@ -30,6 +30,8 @@ services:
       GRILLHOUSE_DB_PORT: "5432"
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       GRILLHOUSE_READONLY_PASSWORD: ${GRILLHOUSE_READONLY_PASSWORD}
+      # Ollama on the host, for document embeddings; without it search falls back to keywords
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
 
 volumes:
   pgdata:

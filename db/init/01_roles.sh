@@ -13,6 +13,8 @@ CREATE ROLE copilot_readonly LOGIN PASSWORD :'ro_password';
 ALTER ROLE copilot_readonly SET default_transaction_read_only = on;
 ALTER ROLE copilot_readonly SET statement_timeout = '5s';
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
+-- pgvector's type and operators live in public: allow using them, not creating anything there
+GRANT USAGE ON SCHEMA public TO copilot_readonly;
 GRANT CONNECT ON DATABASE grillhouse TO copilot_readonly;
 GRANT USAGE ON SCHEMA analytics TO copilot_readonly;
 GRANT SELECT ON ALL TABLES IN SCHEMA analytics TO copilot_readonly;

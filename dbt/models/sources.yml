@@ -12,3 +12,4 @@ sources:
       - name: daily_context
       - name: events
       - name: reviews
+      - name: documents

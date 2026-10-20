@@ -13,6 +13,7 @@ import pandas as pd
 import psycopg
 
 from app.config import db_url
+from app.documents import index
 from pipelines.redact import redact
 
 SEED = Path("seed_data")
@@ -55,6 +56,7 @@ def main() -> None:
             df = frame(table)
             copy(cur, table, df)
             print(f"loaded raw.{table} ({len(df)} rows)")
+        print(f"indexed raw.documents ({index(SEED / 'knowledge', cur)} chunks)")
         # Every order's total must equal the sum of its lines
         cur.execute("""
             SELECT count(*) FROM raw.orders o

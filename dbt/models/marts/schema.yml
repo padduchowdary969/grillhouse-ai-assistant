@@ -38,3 +38,10 @@ models:
         data_tests:
           - accepted_values:
               arguments: {values: [1, 2, 3, 4, 5]}
+  - name: documents
+    description: Menu and policy chunks with nomic-embed-text embeddings (768 dimensions).
+    columns:
+      - name: id
+        data_tests: [unique, not_null]
+      - name: content
+        data_tests: [not_null]
