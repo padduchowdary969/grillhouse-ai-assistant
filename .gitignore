@@ -231,3 +231,4 @@ seed_data/reports/
 # dbt build output
 dbt/target/
 dbt/logs/
+dbt/.user.yml
