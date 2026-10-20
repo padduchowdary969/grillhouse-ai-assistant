@@ -1,6 +1,6 @@
 <div align="center">
 
-# Grill House Ops Copilot
+# Grill House AI assistant 
 
 **An AI analyst for a real late-night takeaway in Manchester.** It answers questions about sales, deliveries,
 menu and reviews in plain English, grounded in the shop's own data, and runs in daily use on the owners' phones.
