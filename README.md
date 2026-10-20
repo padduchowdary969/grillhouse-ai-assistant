@@ -81,11 +81,9 @@ The server listens only on this computer; Tailscale Serve is the only way in fro
 
 ## Roadmap
 
-- [x] Data cleaning
-- [x] Analytics
-- [x] Forecasting
-- [x] Knowledge base (reports, tables, opening hours)
-- [x] Chatbot (command line, local model)
-- [ ] Menu with prices in the knowledge base
-- [x] Chat window (web page, password, Tailscale access)
-- [x] Installable phone app (home-screen web app) and auto-start
+Done (v1, in daily use at the shop): data cleaning, analytics, forecasting, hybrid-search RAG chatbot on a
+local model, automated evals (23/23), installable phone app with password and private Tailscale access.
+
+Next: the **Ops Copilot**: Text-to-SQL, a LangGraph agent for "why" questions, courier analysis, a
+fine-tuned review classifier, actions with human approval, evals in CI, guardrails and a public demo on
+synthetic data. See **[docs/ROADMAP.md](docs/ROADMAP.md)** for the phased plan.
