@@ -6,26 +6,61 @@ Uber Eats Manager exports into clean tables, charts, a written summary and a sal
 
 **[Read the project brief](docs/PROJECT_BRIEF.md)** for the architecture, AI techniques and deployment.
 
-## Try it with sample data
+## Quick start (synthetic demo data)
 
-The real business data is private and never committed. `sample_data/` holds synthetic exports in the
-same layout as real Uber Eats files (made by `src/make_sample_data.py`; every number and review is invented).
+The shop's real data is private and never committed. `seed_data/` holds a synthetic dataset for "Sample Grill
+Kitchen": about 7,800 orders with basket items and deliveries, driven by real Manchester weather and UK bank
+holidays plus synthetic events and courier-shortage weeks, and Uber Eats-style summary exports aggregated from
+those orders. Every order, menu item and review is invented.
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-export GRILLHOUSE_DATA=sample_data
-python src/clean_ubereats.py      # -> sample_data/clean/
-python src/analyse_ubereats.py    # -> sample_data/reports/ubereats_summary.md + charts
-python src/forecast_ubereats.py   # -> sample_data/reports/forecast_summary.md + chart
+cp .env.example .env                    # then set the passwords
+docker compose up setup                 # PostgreSQL + pgvector, synthetic data, dbt models and tests
 ```
+
+Or without Docker for the Python side:
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+docker compose up -d db                 # database only
+python -m pipelines.run_all             # seed data -> clean -> reports -> database -> dbt
+python -m pytest                        # 29 tests
+```
+
+### Repository layout
+
+```
+pipelines/   ingestion: seed-data generator, weather/holidays, cleaning, PII redaction, DB load, reports, forecast
+dbt/         analytics models (orders, order_items, daily_sales, item_sales_monthly, menu_items, reviews) + tests
+db/          schema and database roles (owner vs read-only copilot user)
+app/         chatbot: hybrid retrieval and answers; shared config
+ui/          password-protected chat page, installable on phones
+evals/       chatbot test set (retrieval hit + answer correctness)
+tests/       pytest: redaction, seed-data consistency, cleaning, retrieval, database permissions
+seed_data/   synthetic dataset (public)
+data/        the shop's real exports (git-ignored, private)
+```
+
+### Data model
+
+| Table (schema `analytics`) | One row per |
+|---|---|
+| `orders` | order, with promised vs actual delivery time, lateness and delay reason |
+| `order_items` | item in an order |
+| `daily_sales` | trading night (18:00 to closing), with weather, bank holiday, event and courier-shortage flags |
+| `item_sales_monthly` | item per month |
+| `menu_items` | dish, with price, allergens, dietary tags and spice level |
+| `reviews` | rating, with the comment PII-redacted at ingestion (Presidio) |
+
+The copilot connects as `copilot_readonly`: it can only `SELECT` from `analytics`, can't see `raw`, runs in
+read-only transactions and is cut off after 5 seconds.
 
 ## Use your own Uber Eats data
 
 Download these reports from Uber Eats Manager for the same date range and save them in `data/`
-(git-ignored), then run the same three scripts without `GRILLHOUSE_DATA`:
+(git-ignored), then run `pipelines.clean_ubereats`, `pipelines.analyse_ubereats` and `pipelines.forecast_ubereats`
+without `GRILLHOUSE_DATA`:
 
 | Uber Eats report | Save as |
 |---|---|
@@ -37,15 +72,19 @@ Download these reports from Uber Eats Manager for the same date range and save t
 
 ## What each script does
 
-- `src/clean_ubereats.py`: fixes the exports (byte-order marks, float noise, duplicate item spellings),
+- `pipelines/clean_ubereats.py`: fixes the exports (byte-order marks, float noise, duplicate item spellings),
   groups after-midnight hours into the night the shift started, and cross-checks totals between reports.
-- `src/analyse_ubereats.py`: monthly trend, top items, a night-by-hour order heatmap, the customer funnel
+- `pipelines/analyse_ubereats.py`: monthly trend, top items, a night-by-hour order heatmap, the customer funnel
   and customer ratings with complaint themes.
-- `src/forecast_ubereats.py`: tests three simple methods on past months, forecasts the next three with the
+- `pipelines/forecast_ubereats.py`: tests three simple methods on past months, forecasts the next three with the
   most accurate one (with an 80% range), and spreads each month over a typical week by night and hour.
-- `src/make_sample_data.py`: regenerates the synthetic files in `sample_data/`.
-- `src/chatbot.py`: answers questions in plain English using a free model that runs locally (see below).
-- `src/evaluate_chatbot.py`: scores the chatbot on 20 test questions (11 plainly worded, 9 in casual wording)
+- `pipelines/make_seed_data.py`: generates the synthetic order-level dataset and the summary exports in `seed_data/`.
+- `pipelines/fetch_context.py`: downloads Manchester weather (Open-Meteo) and UK bank holidays (gov.uk).
+- `pipelines/redact.py`: masks names, phone numbers, emails, postcodes and addresses (Presidio + UK patterns).
+- `pipelines/load_db.py`: loads `seed_data/` into PostgreSQL with redaction and integrity checks.
+- `pipelines/run_all.py`: runs the whole pipeline in order.
+- `app/chatbot.py`: answers questions in plain English using a free model that runs locally (see below).
+- `evals/evaluate_chatbot.py`: scores the chatbot on 20 test questions (11 plainly worded, 9 in casual wording)
   for retrieval hit and answer correctness, with expected answers read from the data so it works on real and
   sample data.
 
@@ -59,8 +98,8 @@ embeddings, merged by reciprocal rank fusion) and asks the model to answer only 
 ```bash
 ollama pull qwen3:8b                     # once, about 5 GB
 ollama pull nomic-embed-text             # once, about 270 MB (search by meaning)
-python src/chatbot.py                    # chat; type "quit" to stop
-python src/chatbot.py "Which night is busiest?"
+python -m app.chatbot                    # chat; type "quit" to stop
+python -m app.chatbot "Which night is busiest?"
 ```
 
 Run the clean, analyse and forecast scripts first. Set `GRILLHOUSE_MODEL` to try another Ollama model, or
@@ -68,7 +107,7 @@ Run the clean, analyse and forecast scripts first. Set `GRILLHOUSE_MODEL` to try
 
 ### Chat page and phone app
 
-`src/web_chat.py` serves a password-protected chat page at http://localhost:8501 that can be installed on a
+`ui/web_chat.py` serves a password-protected chat page at http://localhost:8501 that can be installed on a
 phone's home screen like an app. On a Mac:
 
 1. Double-click `start_assistant.command` once to choose the password (stored in the git-ignored `.env`).

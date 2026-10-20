@@ -1,0 +1,13 @@
+# Credentials come from the environment (.env); nothing secret lives here.
+grillhouse:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('GRILLHOUSE_DB_HOST', '127.0.0.1') }}"
+      port: "{{ env_var('GRILLHOUSE_DB_PORT', '5433') | int }}"
+      user: grillhouse
+      password: "{{ env_var('POSTGRES_PASSWORD') }}"
+      dbname: "{{ env_var('GRILLHOUSE_DB_NAME', 'grillhouse') }}"
+      schema: analytics
+      threads: 4

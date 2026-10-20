@@ -1,0 +1,35 @@
+# One command builds everything: docker compose up setup
+#   db     PostgreSQL 17 + pgvector (passwords from the git-ignored .env, see .env.example)
+#   setup  generates the synthetic dataset, loads it and builds the dbt models, then exits
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: grillhouse
+      POSTGRES_USER: grillhouse
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      GRILLHOUSE_READONLY_PASSWORD: ${GRILLHOUSE_READONLY_PASSWORD:?set GRILLHOUSE_READONLY_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:5433:5432"  # this machine only
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U grillhouse -d grillhouse"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  setup:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GRILLHOUSE_DB_HOST: db
+      GRILLHOUSE_DB_PORT: "5432"
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      GRILLHOUSE_READONLY_PASSWORD: ${GRILLHOUSE_READONLY_PASSWORD}
+
+volumes:
+  pgdata:

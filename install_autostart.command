@@ -32,7 +32,7 @@ cat > "$PLIST" <<EOF
   <key>ProgramArguments</key>
   <array>
     <string>/bin/zsh</string><string>-c</string>
-    <string>open -g -a Ollama; exec /usr/bin/caffeinate -is "$PROJECT/.venv/bin/python" "$PROJECT/src/web_chat.py"</string>
+    <string>open -g -a Ollama; exec /usr/bin/caffeinate -is "$PROJECT/.venv/bin/python" -m ui.web_chat</string>
   </array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>

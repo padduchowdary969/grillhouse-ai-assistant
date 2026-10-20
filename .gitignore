@@ -224,10 +224,10 @@ data/
 # macOS
 .DS_Store
 
-# Generated from sample_data/ by the scripts
-sample_data/clean/
-sample_data/reports/
+# Generated from seed_data/ by the scripts
+seed_data/clean/
+seed_data/reports/
 
-# Generated from sample_data/ by the scripts
-sample_data/clean/
-sample_data/reports/
+# dbt build output
+dbt/target/
+dbt/logs/

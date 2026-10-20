@@ -44,7 +44,7 @@ Tailscale · macOS launchd · Git/GitHub
 
 ## 4. Components
 
-### ① Data pipeline (ETL): [`src/clean_ubereats.py`](../src/clean_ubereats.py)
+### ① Data pipeline (ETL): [`pipelines/clean_ubereats.py`](../pipelines/clean_ubereats.py)
 
 - **Inputs:** five Uber Eats Manager exports (monthly sales, item leaderboard, sales by hour, conversion
   funnel, ratings).
@@ -55,14 +55,14 @@ Tailscale · macOS launchd · Git/GitHub
 - **Validation:** **data-quality assertions** that the monthly, hourly and item reports agree on totals
   (to within 1%).
 
-### ② Analytics: [`src/analyse_ubereats.py`](../src/analyse_ubereats.py)
+### ② Analytics: [`pipelines/analyse_ubereats.py`](../pipelines/analyse_ubereats.py)
 
 - **What it covers:** menu concentration (Pareto: 9 of 69 items make 80% of sales), a night-by-hour demand
   heatmap, conversion funnel rates and ratings analysis.
 - **Complaint themes:** grouped from review text with rule-based keyword classification.
 - **Charts:** follow accessibility rules, e.g. no misleading log-scale bars and direct labels on values.
 
-### ③ Forecasting: [`src/forecast_ubereats.py`](../src/forecast_ubereats.py)
+### ③ Forecasting: [`pipelines/forecast_ubereats.py`](../pipelines/forecast_ubereats.py)
 
 - **Model selection:** three baseline models (naive, moving average, linear trend) are compared by
   **rolling-origin backtesting** with MAE and MAPE. The best one, a 3-month moving average, misses by about
@@ -72,7 +72,7 @@ Tailscale · macOS launchd · Git/GitHub
   and prep.
 - **Known limit:** with one settled year of data, the model can't learn seasonal patterns yet.
 
-### ④–⑥ RAG chatbot: [`src/chatbot.py`](../src/chatbot.py)
+### ④–⑥ RAG chatbot: [`app/chatbot.py`](../app/chatbot.py)
 
 - **Knowledge base:** markdown reports split into chunks by heading, plus serialised data tables (items,
   months, night × hour orders, review comments, forecast week) and shop facts. About 13 chunks.
@@ -94,7 +94,7 @@ Tailscale · macOS launchd · Git/GitHub
   units.
 - **Conversation memory:** a short rolling window of past turns supports follow-up questions. The retrieved
   facts aren't kept in that history, which saves context space.
-- **Evaluation:** an automated test set ([`src/evaluate_chatbot.py`](../src/evaluate_chatbot.py)) of 20
+- **Evaluation:** an automated test set ([`evals/evaluate_chatbot.py`](../evals/evaluate_chatbot.py)) of 20
   questions: 11 plainly worded and 9 in casual wording ("what do people moan about?", "which grub barely
   sells?"), including **unanswerable** questions to check the model refuses instead of guessing. Each case
   scores **retrieval hit** (was the right chunk retrieved?) and **answer correctness** (does the reply contain
@@ -109,7 +109,7 @@ Tailscale · macOS launchd · Git/GitHub
   exposed problems that were then fixed: a missing knowledge file in the sample data, the model not knowing
   today's date, and month names not matching "2026-01" style dates.
 
-### ⑦ Deployment: [`src/web_chat.py`](../src/web_chat.py), [`install_autostart.command`](../install_autostart.command)
+### ⑦ Deployment: [`ui/web_chat.py`](../ui/web_chat.py), [`install_autostart.command`](../install_autostart.command)
 
 | Layer | What it does |
 |---|---|
@@ -119,7 +119,7 @@ Tailscale · macOS launchd · Git/GitHub
 | **Authentication** | Password with constant-time comparison, HttpOnly/SameSite session cookies, and a lockout after repeated failures; the secret lives in a git-ignored `.env` |
 | **Network security** | Server listens on localhost only. **Tailscale Serve** provides HTTPS and access only from devices on the private network; the server also refuses any address outside localhost and Tailscale |
 | **Process management** | A macOS **launchd** agent starts it at login, restarts it if it crashes, and keeps the Mac awake on power |
-| **Privacy by design** | Real data is git-ignored; a **synthetic data generator** ([`src/make_sample_data.py`](../src/make_sample_data.py)) makes the public repo reproducible without exposing the business |
+| **Privacy by design** | Real data is git-ignored; a **synthetic data generator** ([`pipelines/make_seed_data.py`](../pipelines/make_seed_data.py)) makes the public repo reproducible without exposing the business |
 
 **Why not Docker or a paid API?** On macOS, Docker containers can't use the Apple GPU, so inference would be
 several times slower. A local model kept the project free and private.

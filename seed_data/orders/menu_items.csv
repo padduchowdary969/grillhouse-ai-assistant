@@ -1,0 +1,31 @@
+item,category,price,allergens,dietary_tags,spice_level
+Double Smash Burger,Burgers,9.99,"gluten, milk, sesame, mustard",,0
+Peri Peri Loaded Fries,Loaded fries,9.49,"milk, egg",,2
+Sticky BBQ Loaded Fries,Loaded fries,9.49,"milk, mustard",,0
+Firecracker Chicken Burger,Burgers,8.99,"gluten, egg, sesame",,3
+Loaded Cheese Fries,Loaded fries,8.49,milk,vegetarian,0
+Lemon Pepper Tenders,Chicken,7.49,"gluten, egg",,0
+Classic Cheeseburger,Burgers,7.49,"gluten, milk, sesame, mustard",,0
+Hot Honey Wings,Chicken,6.99,,gluten-free,2
+Chicken Wrap,Wraps,8.49,"gluten, egg, milk",,1
+Spicy Tenders,Chicken,7.99,"gluten, egg",,3
+Triple Stack Burger,Burgers,10.99,"gluten, milk, sesame, mustard",,0
+Garlic Parmesan Wings,Chicken,7.49,milk,gluten-free,0
+Fries,Sides,2.99,,"vegan, gluten-free",0
+Halloumi Burger,Burgers,8.99,"gluten, milk, sesame",vegetarian,0
+Chicken Loaded Fries,Loaded fries,6.49,"milk, egg",,1
+Cola,Drinks,1.99,,"vegan, gluten-free",0
+Southern Fried Burger,Burgers,6.49,"gluten, egg, milk",,1
+Smoky BBQ Tenders,Chicken,6.49,"gluten, egg, mustard",,0
+Veggie Wrap,Wraps,5.99,gluten,vegan,1
+Orange Soda,Drinks,1.99,,"vegan, gluten-free",0
+Sweet Potato Fries,Sides,3.49,,"vegan, gluten-free",0
+Chocolate Shake,Desserts,5.49,"milk, soya",vegetarian,0
+Mozzarella Sticks,Sides,3.99,"gluten, milk",vegetarian,0
+Onion Rings,Sides,3.49,gluten,vegan,0
+Garlic Mayo,Sauces,0.99,egg,"vegetarian, gluten-free",0
+Chilli Sauce,Sauces,0.99,,"vegan, gluten-free",2
+Vanilla Shake,Desserts,5.49,"milk, soya",vegetarian,0
+Veg Burger,Burgers,6.49,"gluten, soya, sesame",vegan,0
+Cheesy Nachos,Sides,4.99,milk,"vegetarian, gluten-free",1
+Mango Lassi,Drinks,2.99,milk,"vegetarian, gluten-free",0

@@ -29,28 +29,33 @@ built and to the decisions below.
 
 | Built (Oct 2026) | Becomes |
 |---|---|
-| `src/clean_ubereats.py` | `pipelines/` ingestion step for the real summaries |
-| `src/make_sample_data.py`, `sample_data/` | `seed_data/` generator, extended to order level |
-| `src/analyse_ubereats.py` | SQL views / agent tools for charts |
-| `src/forecast_ubereats.py` | Baseline models in the forecaster backtest |
-| `src/chatbot.py` hybrid retriever (TF-IDF + embeddings, RRF) | Retriever tool, moved to pgvector + BM25 |
-| `src/evaluate_chatbot.py` (23 questions, 23/23) | `evals/` golden set, grown to 50+, gate in CI |
-| `src/web_chat.py` + PWA + Tailscale | `ui/` + FastAPI backend; private shop deployment |
+| `pipelines/clean_ubereats.py` | `pipelines/` ingestion step for the real summaries |
+| `pipelines/make_seed_data.py`, `seed_data/` | `seed_data/` generator, extended to order level |
+| `pipelines/analyse_ubereats.py` | SQL views / agent tools for charts |
+| `pipelines/forecast_ubereats.py` | Baseline models in the forecaster backtest |
+| `app/chatbot.py` hybrid retriever (TF-IDF + embeddings, RRF) | Retriever tool, moved to pgvector + BM25 |
+| `evals/evaluate_chatbot.py` (23 questions, 23/23) | `evals/` golden set, grown to 50+, gate in CI |
+| `ui/web_chat.py` + PWA + Tailscale | `ui/` + FastAPI backend; private shop deployment |
 
 ## Phase 1: Data foundation (weeks 1–2)
 
-- [ ] Repo restructure: `app/`, `ui/`, `pipelines/`, `evals/`, `seed_data/`, `tests/`, `docs/`
-- [ ] PostgreSQL + pgvector in Docker; schema for `orders`, `order_items`, `menu_items`, `deliveries`,
+- [x] Repo restructure: `app/`, `ui/`, `pipelines/`, `evals/`, `seed_data/`, `tests/`, `docs/`
+- [x] PostgreSQL + pgvector in Docker; schema for `orders`, `order_items`, `menu_items`, `deliveries`,
       `daily_context`, `documents`
-- [ ] Synthetic order-level generator matched to the real patterns: night-by-hour demand, item mix and
+- [x] Synthetic order-level generator matched to the real patterns: night-by-hour demand, item mix and
       prices, ratings vs delivery time, monthly trend
-- [ ] `daily_context` from free public sources: Manchester weather history (Open-Meteo), UK bank holidays
-- [ ] Synthetic weather and event effects, plus courier-delay spikes, so "why" questions have real answers
-- [ ] PII redaction with Presidio at ingestion (review comments)
-- [ ] dbt models for clean marts (`daily_sales`, `item_sales`, `delivery_performance`)
-- [ ] Pytest for the pipeline and generator; `docker compose up` loads everything
+- [x] `daily_context` from free public sources: Manchester weather history (Open-Meteo), UK bank holidays
+- [x] Synthetic weather and event effects, plus courier-delay spikes, so "why" questions have real answers
+- [x] PII redaction with Presidio at ingestion (review comments)
+- [x] dbt models for clean marts (`daily_sales`, `item_sales`, `delivery_performance`)
+- [x] Pytest for the pipeline and generator; `docker compose up` loads everything
 
-**Gate: data loads cleanly with one command.**
+**Gate: data loads cleanly with one command.** ✅ Passed 20 Oct 2026: `docker compose up setup` builds the
+database from empty in about 14 seconds; 19 dbt tests and 29 pytest tests pass.
+
+Notes: the generator uses hand-tuned patterns rather than the real data as input, so nothing private can leak;
+`delivery_performance` is covered by the `orders` model (lateness per order) and `daily_sales` (per night);
+the read-only copilot user and its limits were set up here, ahead of Phase 2.
 
 ## Phase 2: Q&A and search → public demo (weeks 3–4)
 

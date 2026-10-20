@@ -1,0 +1,11 @@
+# Never copy the shop's private data or secrets into an image
+data/
+.env
+.venv/
+**/__pycache__/
+.pytest_cache/
+dbt/target/
+dbt/logs/
+seed_data/clean/
+seed_data/reports/
+.git/

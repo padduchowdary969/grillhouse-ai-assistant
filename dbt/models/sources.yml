@@ -1,0 +1,14 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    description: Tables loaded from seed_data/ by pipelines/load_db.py
+    tables:
+      - name: orders
+      - name: order_items
+      - name: deliveries
+      - name: menu_items
+      - name: daily_context
+      - name: events
+      - name: reviews

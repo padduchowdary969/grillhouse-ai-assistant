@@ -1,0 +1,40 @@
+version: 2
+
+models:
+  - name: orders
+    description: Every order with its delivery outcome. Money is what customers paid, before Uber's commission.
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: channel
+        data_tests:
+          - accepted_values:
+              arguments: {values: [delivery, pickup]}
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments: {values: [completed, cancelled]}
+      - name: total
+        data_tests: [not_null]
+  - name: order_items
+    columns:
+      - name: order_id
+        data_tests:
+          - relationships:
+              arguments: {to: ref('orders'), field: order_id}
+  - name: daily_sales
+    description: One row per trading night with weather, bank holidays, events and courier shortages.
+    columns:
+      - name: trading_night
+        data_tests: [unique, not_null]
+  - name: item_sales_monthly
+  - name: menu_items
+    columns:
+      - name: item
+        data_tests: [unique, not_null]
+  - name: reviews
+    columns:
+      - name: rating
+        data_tests:
+          - accepted_values:
+              arguments: {values: [1, 2, 3, 4, 5]}

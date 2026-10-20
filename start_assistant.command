@@ -30,5 +30,5 @@ curl -s --retry 20 --retry-connrefused --retry-delay 2 -o /dev/null http://local
 ( curl -s --retry 20 --retry-connrefused --retry-delay 1 -o /dev/null http://localhost:8501/ && open http://localhost:8501 ) &
 
 # Listens on this Mac only; phones reach it through "tailscale serve" (see README). Keeps the Mac awake until closed.
-caffeinate -is .venv/bin/python src/web_chat.py
+caffeinate -is .venv/bin/python -m ui.web_chat
 echo "Assistant stopped. You can close this window."

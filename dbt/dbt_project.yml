@@ -1,0 +1,11 @@
+name: grillhouse
+version: "1.0.0"
+profile: grillhouse
+model-paths: ["models"]
+test-paths: ["tests"]
+target-path: target
+clean-targets: ["target", "logs"]
+
+models:
+  grillhouse:
+    +materialized: table   # the copilot's read-only user queries these in schema `analytics`
