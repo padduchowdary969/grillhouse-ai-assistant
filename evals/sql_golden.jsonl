@@ -35,7 +35,7 @@
 {"id": "worst_late_night", "question": "Which night had the most late deliveries?", "sql": "SELECT trading_night FROM daily_sales ORDER BY late_deliveries DESC, trading_night LIMIT 1"}
 {"id": "shortage_nights", "question": "How many nights had a courier shortage?", "sql": "SELECT count(*) FROM daily_sales WHERE courier_shortage"}
 {"id": "cancelled_late_reason", "question": "How many cancelled orders were there for each delay reason?", "sql": "SELECT delay_reason, count(*) FROM orders WHERE status = 'cancelled' GROUP BY 1 ORDER BY 2 DESC"}
-{"id": "bank_holiday_orders", "question": "Do bank holiday nights get more orders on average than other nights?", "sql": "SELECT is_bank_holiday, round(avg(orders), 1) FROM daily_sales WHERE trading_night >= '2025-10-01' GROUP BY 1 ORDER BY 1"}
+{"id": "bank_holiday_orders", "question": "Do bank holiday nights get more orders on average than other nights?", "sql": "SELECT is_bank_holiday, round(avg(orders), 1) FROM daily_sales GROUP BY 1 ORDER BY 1"}
 {"id": "christmas_day", "question": "How many orders were there on Christmas night 2025?", "sql": "SELECT orders FROM daily_sales WHERE trading_night = '2025-12-25'"}
 {"id": "event_list", "question": "Which events happened, and how many nights did each last?", "sql": "SELECT event, count(*) FROM daily_sales WHERE event IS NOT NULL GROUP BY 1 ORDER BY 1"}
 {"id": "freshers_orders", "question": "What was the average number of orders per night during university freshers week?", "sql": "SELECT round(avg(orders), 1) FROM daily_sales WHERE event = 'University freshers week'"}

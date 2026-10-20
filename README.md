@@ -1,111 +1,249 @@
-# grillhouse-ai-assistant
+<div align="center">
+
+# Grill House Ops Copilot
+
+**An AI analyst for a real late-night takeaway in Manchester.** It answers questions about sales, deliveries,
+menu and reviews in plain English, grounded in the shop's own data, and runs in daily use on the owners' phones.
 
 [![CI](https://github.com/padduchowdary969/grillhouse-ai-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/padduchowdary969/grillhouse-ai-assistant/actions/workflows/ci.yml)
-“AI business assistant for a real restaurant: analytics, forecasting, RAG chatbot”
+![Python](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17%20%2B%20pgvector-4169E1?logo=postgresql&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.156-009688?logo=fastapi&logoColor=white)
+![dbt](https://img.shields.io/badge/dbt-1.12-FF694B?logo=dbt&logoColor=white)
+![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
-Built for a late-night takeaway (open 18:00–08:00) that sells through Uber Eats. The scripts turn raw
-Uber Eats Manager exports into clean tables, charts, a written summary and a sales forecast.
+[Architecture](docs/ARCHITECTURE.md) · [Design decisions](docs/DESIGN_DECISIONS.md) · [Evaluation](docs/EVALUATION.md) · [Roadmap](docs/ROADMAP.md) · [Project brief](docs/PROJECT_BRIEF.md)
 
-**[Read the project brief](docs/PROJECT_BRIEF.md)** for the architecture, AI techniques and deployment.
+</div>
 
-## Quick start (synthetic demo data)
+---
 
-The shop's real data is private and never committed. `seed_data/` holds a synthetic dataset for "Sample Grill
-Kitchen": about 7,800 orders with basket items and deliveries, driven by real Manchester weather and UK bank
-holidays plus synthetic events and courier-shortage weeks, and Uber Eats-style summary exports aggregated from
-those orders. Every order, menu item and review is invented.
+## Why this exists
 
-```bash
-cp .env.example .env                    # then set the passwords
-docker compose up setup                 # PostgreSQL + pgvector, synthetic data, dbt models and tests
+The shop trades from 18:00 to 08:00 and sells through Uber Eats. Its numbers sit in separate platform exports
+that are hard to read mid-shift, and they're grouped by calendar day, which splits every night's trade in two.
+This project turns those exports into a copilot the owners can ask things like:
+
+> *"What should I prep for Saturday night?"* · *"Why did orders drop in the week of 10 November?"* ·
+> *"Which time slots get the most courier delays?"* · *"Is the chicken halal?"*
+
+The real business data is private and never leaves the owners' Mac. Everything public (this repo, the tests, the
+demo) runs on a **synthetic dataset** that copies the shape of a late-night takeaway: about 7,800 orders driven
+by real Manchester weather and UK bank holidays.
+
+## Highlights
+
+| | |
+|---|---|
+| 🗣️ **Grounded answers** | Hybrid retrieval (BM25 + pgvector, reciprocal rank fusion) with source citations; Text-to-SQL over a read-only analytics schema |
+| 🛡️ **Safe by construction** | Every model-written query is parsed (sqlglot) and must be a single `SELECT` on approved tables, then runs as a read-only, time-limited database role. PII is redacted at ingestion (Presidio) |
+| 📏 **Measured, not assumed** | 93-question golden sets with execution-match scoring; search quality gated in CI |
+| 📈 **Forecasting** | LightGBM demand model, rolling-origin backtest against baselines, tracked in MLflow, turned into a buns-and-patties order |
+| 📱 **In real use** | Installable phone app (PWA) behind Tailscale with JWT sessions, auto-started on the shop's Mac |
+| ⚙️ **Reproducible** | `docker compose up setup` builds the database from empty in about 14 seconds; CI on every push |
+
+## Results
+
+| What | Score |
+|---|---|
+| Document search, hybrid (20 questions) | **hit@1 1.00**, MRR 1.00 (keyword-only: hit@1 0.90) |
+| RAG assistant, hybrid search (23 questions) | **23/23** on real and synthetic data (keyword-only: 16/20) |
+| Text-to-SQL, local Qwen3 8B (50 questions, execution match) | 34/50 (68%) |
+| Text-to-SQL, Claude via AWS Bedrock | *in progress* |
+| Demand forecast, LightGBM vs best baseline (orders/night MAE) | **3.52** vs 3.58 overall · **3.13** vs 3.41 on rainy, event and bank-holiday nights |
+| Tests | 81 pytest tests · 16 dbt data tests · all passing in CI |
+
+Details and failure analysis: [docs/EVALUATION.md](docs/EVALUATION.md).
+
+## Architecture
+
+```mermaid
+flowchart TB
+    subgraph clients["Clients"]
+        phone["📱 Phone app (PWA)"]
+        api_client["API clients · /docs"]
+    end
+
+    subgraph backend["FastAPI backend"]
+        gate["Auth (JWT, roles) · rate limits · request log · network allowlist"]
+        chat["/chat · RAG assistant"]
+        sql["/ask/sql · Text-to-SQL"]
+        search["/search · cited documents"]
+        agent["Agent: why-questions, drafts (Phase 3)"]
+    end
+
+    subgraph models["Model layer"]
+        router["Provider interface · routing"]
+        local["Ollama: Qwen3 8B + nomic-embed-text"]
+        bedrock["Claude via AWS Bedrock (Phase 2)"]
+    end
+
+    subgraph data["Data layer"]
+        pg[("PostgreSQL 17 + pgvector<br/>raw → analytics (dbt)")]
+        guard["sqlglot validator + read-only role"]
+    end
+
+    subgraph pipe["Pipelines (one command)"]
+        ingest["Seed / Uber Eats exports"] --> redact["PII redaction (Presidio)"] --> load["Load + integrity checks"] --> dbt["dbt models + tests"] --> forecast["LightGBM forecast · MLflow"]
+    end
+
+    phone --> gate
+    api_client --> gate
+    gate --> chat & sql & search
+    gate -.-> agent
+    chat --> router
+    sql --> router
+    router --> local
+    router -.-> bedrock
+    sql --> guard --> pg
+    search --> pg
+    dbt --> pg
+    load --> pg
 ```
 
-Or without Docker for the Python side:
+Dashed lines are planned. A full component breakdown, data model and deployment topology are in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+### How a question is answered
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Owner
+    participant API as FastAPI
+    participant LLM as Model (Qwen3 / Claude)
+    participant Guard as SQL validator
+    participant DB as Postgres (read-only role)
+
+    Owner->>API: "Do rainy nights get more orders?"
+    API->>API: Check JWT, role, rate limit
+    API->>LLM: Schema + business rules + examples + question
+    LLM-->>API: SELECT is_rainy, avg(orders) FROM daily_sales …
+    API->>Guard: Parse: one SELECT? approved tables? no pg_* or writes?
+    Guard->>DB: Schema-qualified, row-capped query
+    DB-->>API: Result rows (5 s statement timeout)
+    alt Rejected or failed
+        API->>LLM: Previous query + error, try again (up to 3 attempts)
+    end
+    API->>LLM: Question + result table
+    LLM-->>API: "Rainy nights average 18.2 orders vs 16.0 on dry nights."
+    API-->>Owner: Answer + the SQL that produced it
+```
+
+## Tech stack
+
+| Layer | Tools |
+|---|---|
+| Language and data | Python 3.12, pandas, NumPy |
+| Storage and transformation | PostgreSQL 17, pgvector (HNSW), dbt-core 1.12 + dbt-postgres |
+| Retrieval | BM25 (rank-bm25), nomic-embed-text embeddings, reciprocal rank fusion |
+| Models | Qwen3 8B on Ollama (local); Claude via AWS Bedrock (in progress) |
+| Text-to-SQL safety | sqlglot (AST validation), Postgres read-only role with statement timeout |
+| Privacy | Microsoft Presidio + spaCy, custom UK phone, postcode and address recognisers |
+| Forecasting and tracking | LightGBM, scikit-learn, MLflow (SQLite store) |
+| Backend and app | FastAPI, Uvicorn, PyJWT, Pydantic; vanilla JS PWA |
+| Context data | Open-Meteo (Manchester weather history), gov.uk bank holidays |
+| Infrastructure | Docker Compose, GitHub Actions, macOS launchd, Tailscale Serve (HTTPS, private network) |
+| Testing | pytest (81), dbt data tests (16), golden-set evaluators |
+
+## Quick start
+
+```bash
+git clone https://github.com/padduchowdary969/grillhouse-ai-assistant.git
+cd grillhouse-ai-assistant
+cp .env.example .env                  # set the passwords
+docker compose up setup               # Postgres + pgvector, synthetic data, dbt models + tests, forecast
+```
+
+Then run the API and tests locally:
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-docker compose up -d db                 # database only
-python -m pipelines.run_all             # seed data -> clean -> reports -> database -> dbt
-python -m pytest                        # 81 tests
+docker compose up -d db
+python -m pytest                      # 81 tests
+uvicorn app.api:app --port 8000       # interactive API docs at http://localhost:8000/docs
 ```
 
-### Repository layout
+The assistant and Text-to-SQL endpoints need a model: install [Ollama](https://ollama.com), then
+`ollama pull qwen3:8b` and `ollama pull nomic-embed-text`. On macOS, LightGBM needs OpenMP (`brew install libomp`);
+the Docker image already includes it.
 
-```
-pipelines/   ingestion: seed-data generator, weather/holidays, cleaning, PII redaction, DB load, reports, forecast
-dbt/         analytics models (orders, order_items, daily_sales, item_sales_monthly, menu_items, reviews) + tests
-db/          schema and database roles (owner vs read-only copilot user)
-app/         chatbot: hybrid retrieval and answers; shared config
-ui/          password-protected chat page, installable on phones
-evals/       chatbot test set (retrieval hit + answer correctness)
-tests/       pytest: redaction, seed-data consistency, cleaning, retrieval, database permissions
-seed_data/   synthetic dataset (public)
-data/        the shop's real exports (git-ignored, private)
-```
-
-### Data model
-
-| Table (schema `analytics`) | One row per |
-|---|---|
-| `orders` | order, with promised vs actual delivery time, lateness and delay reason |
-| `order_items` | item in an order |
-| `daily_sales` | trading night (18:00 to closing), with weather, bank holiday, event and courier-shortage flags |
-| `item_sales_monthly` | item per month |
-| `menu_items` | dish, with price, allergens, dietary tags and spice level |
-| `reviews` | rating, with the comment PII-redacted at ingestion (Presidio) |
-
-The copilot connects as `copilot_readonly`: it can only `SELECT` from `analytics`, can't see `raw`, runs in
-read-only transactions and is cut off after 5 seconds.
-
-## Copilot API (Phase 2, in progress)
+<details>
+<summary><b>Run each pipeline step yourself</b></summary>
 
 ```bash
-uvicorn app.api:app --port 8000          # interactive docs at http://localhost:8000/docs
+python -m pipelines.fetch_context     # Manchester weather + UK bank holidays (cached in seed_data/context/)
+python -m pipelines.run_all           # everything below, in order
+python -m pipelines.make_seed_data    # synthetic orders, items, deliveries, reviews, menu and policies
+GRILLHOUSE_DATA=seed_data python -m pipelines.clean_ubereats
+GRILLHOUSE_DATA=seed_data python -m pipelines.analyse_ubereats
+python -m pipelines.load_db           # load with PII redaction and integrity checks
+dbt build --project-dir dbt --profiles-dir dbt
+python -m pipelines.forecast_demand   # LightGBM vs baselines, MLflow, ingredient plan
+```
+</details>
+
+<details>
+<summary><b>Run the evaluations</b></summary>
+
+```bash
+python -m evals.evaluate_search                     # hit@1 / hit@3 / MRR, keyword vs hybrid (no model needed)
+python -m evals.evaluate_sql --provider local       # 50-question Text-to-SQL golden set, execution match
+python -m evals.evaluate_chatbot                    # 23-question RAG assistant set
+```
+</details>
+
+## What the data looks like
+
+<p align="center">
+  <img src="docs/images/orders_heatmap.png" alt="Orders by trading night and hour: busiest between 03:00 and 06:00 on Friday and Saturday nights" width="860"><br>
+  <sub>Orders by trading night and hour (synthetic demo data). A "night" runs from 18:00 to closing, so 04:00 on Sunday belongs to Saturday night.</sub>
+</p>
+
+<p align="center">
+  <img src="docs/images/monthly_sales.png" alt="Monthly sales ramping up after launch in April 2025, then a plateau of about £12,000 to £15,000" width="720"><br>
+  <sub>Monthly sales after launch (synthetic demo data).</sub>
+</p>
+
+## API
+
+| Endpoint | Access | What it does |
+|---|---|---|
+| `POST /auth/token` | public | Sign in; returns a JWT carrying the role (owner or staff) |
+| `POST /chat` | signed in, rate-limited | RAG assistant over the reports, streamed (used by the phone app) |
+| `POST /ask/sql` | signed in, rate-limited | Text-to-SQL: question → validated query → answer, with the SQL shown |
+| `POST /search` | signed in | Menu and policy search with citations |
+| `POST /sql` | owners only | Run a validated read-only query directly |
+| `GET /health` | public | Database check |
+
+## Security and privacy
+
+- **Two kinds of data:** real business data lives only in the git-ignored `data/` folder and never enters an image (`.dockerignore`), the database or CI. The public repo contains synthetic data only.
+- **Database permissions:** the copilot connects as `copilot_readonly`. It can `SELECT` from `analytics` only, can't see `raw`, runs in read-only transactions and is cancelled after 5 seconds.
+- **Query validation:** before any query reaches the database, sqlglot rejects stacked statements, writes (including inside CTEs), system catalogs and `pg_*` functions, and caps results at 200 rows.
+- **PII redaction:** names, phone numbers, emails, postcodes and street addresses are masked before storage. The synthetic data includes test cases for redaction, and prompt-injection attempts for the planned guardrails.
+- **Access control:** HttpOnly session cookies (Secure over HTTPS), JWT roles, a wrong-password lockout, and per-user rate limits. In the shop's private deployment, only the Mac itself and the Tailscale network can connect.
+
+## Repository layout
+
+```
+app/          API, RAG assistant, Text-to-SQL, SQL validator, document search, model providers, config
+pipelines/    seed-data generator, context fetch, cleaning, PII redaction, DB load, reports, forecasting
+dbt/          analytics models and data tests
+db/           schema and database roles
+evals/        golden sets, evaluators, results
+ui/           phone app (PWA) and icons
+tests/        pytest suite
+seed_data/    synthetic dataset (public)
+scripts/      macOS launcher and auto-start installer for the private deployment
+docs/         architecture, design decisions, evaluation, roadmap, project brief
 ```
 
-| Endpoint | What it does |
-|---|---|
-| `POST /auth/token` | Sign in; returns a JWT carrying the role (owner or staff) |
-| `POST /chat` | RAG assistant over the reports, streamed (used by the phone app) |
-| `POST /ask/sql` | Text-to-SQL: question → validated query → answer, with the SQL shown (rate-limited) |
-| `POST /search` | Menu and policy search (pgvector + BM25, reciprocal rank fusion) with citations |
-| `POST /sql` | Run a validated read-only query directly (owners only) |
-| `GET /health` | Database check |
+## Use it with your own Uber Eats data
 
-Every query is parsed with sqlglot and must be a single `SELECT` over the six analytics tables (no system
-tables, no `pg_*` functions, no writes hidden in CTEs, 200-row cap), and then runs as the read-only database user.
-
-### Evaluation so far
-
-| What | Score |
-|---|---|
-| Text-to-SQL golden set (50 questions, execution match), local Qwen3 8B | 33/50 (66%) |
-| Text-to-SQL, Claude via Bedrock | pending AWS setup |
-| RAG chatbot (23 questions), hybrid search | 23/23 on real and synthetic data |
-| RAG chatbot, keyword search only | 16/20 on the plain + casual sets |
-| Document search (20 questions), hybrid | hit@1 1.00, MRR 1.00 |
-| Document search, keyword only (gated in CI) | hit@1 0.90, hit@3 1.00 |
-
-### Demand forecast
-
-`pipelines/forecast_demand.py` forecasts orders for the next 7 nights with LightGBM, backtested over 8 weeks
-(rolling origin) and tracked in MLflow, then converts the forecast into buns and patties to order.
-
-| Model | Mean abs. error (orders/night) | On rainy, event and bank-holiday nights |
-|---|---|---|
-| LightGBM | **3.52** | **3.13** |
-| Same night, 4-week average | 3.58 | 3.41 |
-| Same night last week | 4.57 | 4.18 |
-
-Pure chance (Poisson noise at ~16 orders a night) accounts for about 3.26, so on ordinary nights the strong
-models are near the limit; LightGBM's gain comes from weather and calendar context.
-
-## Use your own Uber Eats data
-
-Download these reports from Uber Eats Manager for the same date range and save them in `data/`
-(git-ignored), then run `pipelines.clean_ubereats`, `pipelines.analyse_ubereats` and `pipelines.forecast_ubereats`
-without `GRILLHOUSE_DATA`:
+Download these reports from Uber Eats Manager and save them in `data/` (git-ignored). Then run
+`pipelines.clean_ubereats`, `pipelines.analyse_ubereats` and `pipelines.forecast_ubereats` without `GRILLHOUSE_DATA`.
 
 | Uber Eats report | Save as |
 |---|---|
@@ -115,62 +253,19 @@ without `GRILLHOUSE_DATA`:
 | User conversion funnel | `data/ubereats_funnel_2026.csv` |
 | Ratings | `data/ubereats_reviews_2026.csv` |
 
-## What each script does
-
-- `pipelines/clean_ubereats.py`: fixes the exports (byte-order marks, float noise, duplicate item spellings),
-  groups after-midnight hours into the night the shift started, and cross-checks totals between reports.
-- `pipelines/analyse_ubereats.py`: monthly trend, top items, a night-by-hour order heatmap, the customer funnel
-  and customer ratings with complaint themes.
-- `pipelines/forecast_ubereats.py`: tests three simple methods on past months, forecasts the next three with the
-  most accurate one (with an 80% range), and spreads each month over a typical week by night and hour.
-- `pipelines/make_seed_data.py`: generates the synthetic order-level dataset and the summary exports in `seed_data/`.
-- `pipelines/fetch_context.py`: downloads Manchester weather (Open-Meteo) and UK bank holidays (gov.uk).
-- `pipelines/redact.py`: masks names, phone numbers, emails, postcodes and addresses (Presidio + UK patterns).
-- `pipelines/load_db.py`: loads `seed_data/` into PostgreSQL with redaction and integrity checks.
-- `pipelines/run_all.py`: runs the whole pipeline in order.
-- `app/chatbot.py`: answers questions in plain English using a free model that runs locally (see below).
-- `evals/evaluate_chatbot.py`: scores the chatbot on 20 test questions (11 plainly worded, 9 in casual wording)
-  for retrieval hit and answer correctness, with expected answers read from the data so it works on real and
-  sample data.
-
-## Chatbot (free, runs on your computer)
-
-The chatbot uses [Ollama](https://ollama.com) to run an open model locally, so it costs nothing and no
-business data leaves the machine. For each question it retrieves the most relevant sections of the reports,
-tables and `knowledge/*.txt` files with **hybrid search** (TF-IDF keywords plus `nomic-embed-text`
-embeddings, merged by reciprocal rank fusion) and asks the model to answer only from them.
-
-```bash
-ollama pull qwen3:8b                     # once, about 5 GB
-ollama pull nomic-embed-text             # once, about 270 MB (search by meaning)
-python -m app.chatbot                    # chat; type "quit" to stop
-python -m app.chatbot "Which night is busiest?"
-```
-
-Run the clean, analyse and forecast scripts first. Set `GRILLHOUSE_MODEL` to try another Ollama model, or
-`GRILLHOUSE_SEARCH=keyword` to use keyword search only.
-
-### Chat page and phone app
-
-The FastAPI app (`app/api.py`) serves the chat page from `ui/static/` at `/`. It can be installed on a phone's
-home screen like an app, signs in with an HttpOnly session cookie (a JWT, 30 days) and streams answers from
-`POST /chat`. On a Mac:
-
-1. Double-click `start_assistant.command` once to choose the password (stored in the git-ignored `.env`).
-2. Double-click `install_autostart.command` so the assistant starts at login on port 8501, restarts if it stops
-   and keeps the Mac awake on power (`./install_autostart.command remove` undoes it).
-3. With [Tailscale](https://tailscale.com) installed, run `tailscale serve --bg 8501` once. Devices on your
-   tailnet then open `https://<your-mac>.<tailnet>.ts.net` and choose "Add to Home Screen".
-
-In this private mode (`GRILLHOUSE_ALLOWED_NETWORKS=private`) the server listens only on this computer and refuses
-any address outside it and the Tailscale network. Sign-in locks after 10 wrong passwords until restart.
-`ui/web_chat.py` is the previous standalone server, kept as a fallback for now.
+For the private phone app on a Mac, see [docs/ARCHITECTURE.md § Deployment](docs/ARCHITECTURE.md#deployment).
 
 ## Roadmap
 
-Done (v1, in daily use at the shop): data cleaning, analytics, forecasting, hybrid-search RAG chatbot on a
-local model, automated evals (23/23), installable phone app with password and private Tailscale access.
+| Phase | Status |
+|---|---|
+| 1. Data foundation: schema, synthetic data, PII redaction, dbt, one-command setup | ✅ Done |
+| 2. Q&A and search: Text-to-SQL, hybrid retrieval, FastAPI, LightGBM, CI, golden sets | 🟡 Bedrock and public demo remaining |
+| 3. Agent and actions: LangGraph "why" agent, courier analysis, drafts with human approval, review classifier | ⬜ Next |
+| 4. Prove and ship: Ragas/DeepEval, guardrails, RBAC, Langfuse tracing, demo video | ⬜ Planned |
 
-Next: the **Ops Copilot**: Text-to-SQL, a LangGraph agent for "why" questions, courier analysis, a
-fine-tuned review classifier, actions with human approval, evals in CI, guardrails and a public demo on
-synthetic data. See **[docs/ROADMAP.md](docs/ROADMAP.md)** for the phased plan.
+Full checklist: [docs/ROADMAP.md](docs/ROADMAP.md).
+
+## License
+
+[MIT](LICENSE). The synthetic dataset and every name in it are invented.

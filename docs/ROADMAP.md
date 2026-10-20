@@ -63,7 +63,7 @@ the read-only copilot user and its limits were set up here, ahead of Phase 2.
       sign-in, streamed /chat, private-network mode for the shop)
 - [ ] Claude via Bedrock: client, model routing stub, cost and latency logging per request
 - [x] Text-to-SQL tool: read-only database user, SQL allowlist (SELECT only, no system tables), query
-      validation, exact-match checks in evals (20-question golden set; local Qwen3 8B: 13/20)
+      validation, exact-match checks in evals (50-question golden set; local Qwen3 8B: 34/50)
 - [x] Retriever on pgvector + BM25 with citations (RRF fusion); menu and policy documents. Cross-encoder
       re-ranking deferred until the corpus grows
 - [x] LightGBM demand forecaster on daily synthetic data, backtested against the current baselines, tracked in

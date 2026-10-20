@@ -1,6 +1,6 @@
 #!/bin/zsh
 # Double-click to start the Grill House assistant (or just open it, if auto-start is already running it).
-cd "$(dirname "$0")" || exit 1
+cd "$(dirname "$0")/../.." || exit 1  # project root
 
 saved=$(grep '^GRILLHOUSE_PASSWORD=' .env 2>/dev/null | head -1 | cut -d= -f2-)
 if [ ${#saved} -lt 8 ]; then

@@ -1,13 +1,15 @@
 #!/bin/zsh
 # Double-click once: the assistant then starts by itself whenever you log in to this Mac, restarts if it
 # stops, and keeps the Mac awake while plugged in. Run with "remove" to undo: ./install_autostart.command remove
-cd "$(dirname "$0")" || exit 1
+cd "$(dirname "$0")/../.." || exit 1  # project root
 PROJECT="$PWD"
 LABEL="com.grillhouse.assistant"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 LOG="$HOME/Library/Logs/grillhouse-assistant.log"
 
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null
+# bootout returns before the old service has fully stopped; wait so the new one can register
+for _ in {1..20}; do launchctl print "gui/$(id -u)/$LABEL" >/dev/null 2>&1 || break; sleep 0.5; done
 
 if [ "$1" = "remove" ]; then
   rm -f "$PLIST"
@@ -17,7 +19,7 @@ fi
 
 saved=$(grep '^GRILLHOUSE_PASSWORD=' .env 2>/dev/null | head -1 | cut -d= -f2-)
 if [ ${#saved} -lt 8 ]; then
-  echo "Set a chat password first: double-click start_assistant.command once, then run this again."
+  echo "Set a chat password first: double-click scripts/macos/start_assistant.command once, then run this again."
   read -k1; exit 1
 fi
 

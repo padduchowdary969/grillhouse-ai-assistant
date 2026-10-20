@@ -1,154 +1,73 @@
-# Grill House AI Assistant: Project Brief
+# Grill House Ops Copilot: Project Brief
 
-## 1. Summary
+*A one-page summary for reviewers. The full detail is in the [README](../README.md),
+[Architecture](ARCHITECTURE.md), [Design decisions](DESIGN_DECISIONS.md) and [Evaluation](EVALUATION.md).*
 
-A **privately hosted AI business assistant** for a late-night takeaway (open 18:00–08:00) that sells through
-Uber Eats. It turns raw platform exports into analytics and a sales forecast, then answers the owners'
-questions in plain English through a **retrieval-augmented generation (RAG)** chatbot. The chatbot runs on a
-**local open-source large language model**, so there are no API costs and the business data never leaves the
-owner's machine. The owners use it as an **installable mobile web app** from anywhere.
+## The problem
 
-**Stack:** Python · pandas · NumPy · matplotlib · Ollama · Qwen3 8B · nomic-embed-text · hybrid retrieval · HTTP server · PWA ·
-Tailscale · macOS launchd · Git/GitHub
+A late-night takeaway in Manchester (open 18:00–08:00) sells through Uber Eats. Its sales, menu performance, peak
+hours, conversion funnel and reviews sit in separate platform exports. Those are hard to read on a phone mid-shift,
+and they're grouped by calendar day, which splits every night's trade in two. The owners wanted plain-English
+answers, a forecast to plan staff and stock, and no exposure of their business data.
 
-## 2. Problem
+## What was built
 
-- **Scattered data:** sales, menu performance, peak hours, customer funnel and reviews sit in separate
-  Uber Eats reports, and are hard to read on a phone mid-shift.
-- **Overnight trading:** an order at 04:00 on Sunday belongs to Saturday night's shift, but the platform
-  groups it by calendar day, which distorts every daily view.
-- **Constraints:** no budget for paid AI APIs, and business data must stay private.
+An AI analyst the owners use on their phones:
 
-## 3. Architecture
+- **Answers grounded in the shop's data:** a RAG assistant over reports and tables, and Text-to-SQL over a
+  PostgreSQL analytics schema, always showing the SQL behind a figure.
+- **Cited menu and policy search:** hybrid retrieval (BM25 + pgvector, reciprocal rank fusion).
+- **Demand forecast:** LightGBM, backtested against baselines and tracked in MLflow, turned into a buns-and-patties
+  order.
+- **Private by design:** a phone app (PWA) served from the shop's Mac and reachable only over Tailscale. PII is
+  redacted at ingestion, and the public repo runs on a synthetic dataset.
+
+## How it works
 
 ```
- Uber Eats exports (5 CSVs)
-        │
-        ▼
- ① Data pipeline (ETL) ── cleaning, validation, feature engineering
-        │
-        ├──► ② Analytics ── charts + markdown report
-        ├──► ③ Forecasting ── backtested model + prediction intervals
-        ▼
- ④ Knowledge base ── reports, tables, shop info → chunked documents
-        │
-        ▼
- ⑤ Hybrid retriever (TF-IDF + embeddings) ── top-k relevant chunks per question
-        │
-        ▼
- ⑥ LLM inference (Qwen3 8B via Ollama, local) ── grounded answer, streamed
-        │
-        ▼
- ⑦ Web app (PWA) ── password auth → Tailscale Serve (HTTPS) → owners' phones
+Uber Eats exports / synthetic orders + Manchester weather + bank holidays
+  → clean (trading nights) → PII redaction (Presidio) → PostgreSQL raw
+  → dbt analytics models (16 data tests) → embeddings (pgvector) → LightGBM forecast (MLflow)
+  → FastAPI: JWT roles · rate limits · /chat (RAG) · /ask/sql (Text-to-SQL) · /search (citations)
+  → model layer: Qwen3 8B on Ollama today, Claude via AWS Bedrock next
 ```
 
-## 4. Components
+Model-written SQL passes two independent checks: a sqlglot validator (one `SELECT`, approved tables only, no writes
+or system functions, row cap), then a read-only, time-limited database role.
 
-### ① Data pipeline (ETL): [`pipelines/clean_ubereats.py`](../pipelines/clean_ubereats.py)
+## Results
 
-- **Inputs:** five Uber Eats Manager exports (monthly sales, item leaderboard, sales by hour, conversion
-  funnel, ratings).
-- **Cleaning:** removes byte-order marks and floating-point noise, normalises column names, merges duplicate
-  item spellings, and drops internal IDs from the ratings data (data minimisation).
-- **Feature engineering:** adds a **"trading night"** feature that assigns after-midnight orders to the shift
-  that started the evening before, and flags orders outside opening hours.
-- **Validation:** **data-quality assertions** that the monthly, hourly and item reports agree on totals
-  (to within 1%).
-
-### ② Analytics: [`pipelines/analyse_ubereats.py`](../pipelines/analyse_ubereats.py)
-
-- **What it covers:** menu concentration (Pareto: 9 of 69 items make 80% of sales), a night-by-hour demand
-  heatmap, conversion funnel rates and ratings analysis.
-- **Complaint themes:** grouped from review text with rule-based keyword classification.
-- **Charts:** follow accessibility rules, e.g. no misleading log-scale bars and direct labels on values.
-
-### ③ Forecasting: [`pipelines/forecast_ubereats.py`](../pipelines/forecast_ubereats.py)
-
-- **Model selection:** three baseline models (naive, moving average, linear trend) are compared by
-  **rolling-origin backtesting** with MAE and MAPE. The best one, a 3-month moving average, misses by about
-  12% a month on average.
-- **Uncertainty:** an **80% prediction interval** that widens with forecast distance.
-- **Typical week:** the monthly forecast is split into expected orders per night and per hour, for staffing
-  and prep.
-- **Known limit:** with one settled year of data, the model can't learn seasonal patterns yet.
-
-### ④–⑥ RAG chatbot: [`app/chatbot.py`](../app/chatbot.py)
-
-- **Knowledge base:** markdown reports split into chunks by heading, plus serialised data tables (items,
-  months, night × hour orders, review comments, forecast week) and shop facts. About 13 chunks.
-- **Retrieval:** **hybrid search**. Each chunk is ranked twice: by **sparse retrieval** (TF-IDF with light
-  stemming and stop-word removal, titles weighted double) and by **dense retrieval** (cosine similarity of
-  `nomic-embed-text` **embeddings**, with the model's query/document task prefixes). The two rankings are
-  merged with **reciprocal rank fusion (RRF)**, and the **top-k = 5** chunks go to the model. Keywords catch
-  exact dish names; embeddings catch meaning ("when do we get slammed?" → busy-times table). Shop facts that
-  every answer needs (opening hours) are pinned into the **system prompt** instead, along with today's date so
-  relative questions like "next month" resolve.
-- **Generation:** Qwen3 8B, an open-weights model with about 8 billion parameters, **4-bit quantized**
-  (about 5 GB). It runs locally through Ollama on Apple-silicon GPU acceleration.
-- **Settings:** temperature 0.2, a 16K-token **context window**, reasoning ("thinking") mode turned off to cut
-  response time, and answers **streamed** as they're generated.
-- **Grounding and hallucination control:** the system prompt tells the model to answer only from the
-  retrieved context and to say "I don't have that information" otherwise.
-- **Prompt engineering:** the instructions require mentioning exceptions and quoting table values exactly.
-  Tables carry explicit labels (e.g. annual totals vs per-night forecasts) so the small model doesn't mix up
-  units.
-- **Conversation memory:** a short rolling window of past turns supports follow-up questions. The retrieved
-  facts aren't kept in that history, which saves context space.
-- **Evaluation:** an automated test set ([`evals/evaluate_chatbot.py`](../evals/evaluate_chatbot.py)) of 20
-  questions: 11 plainly worded and 9 in casual wording ("what do people moan about?", "which grub barely
-  sells?"), including **unanswerable** questions to check the model refuses instead of guessing. Each case
-  scores **retrieval hit** (was the right chunk retrieved?) and **answer correctness** (does the reply contain
-  the expected values, read from the data so the same tests run on real and synthetic data?).
-
-  | Search | Plain questions | Casual wording | Total |
-  |---|---|---|---|
-  | Keyword only (TF-IDF) | 11/11 | 5/9 | 16/20 |
-  | **Hybrid (TF-IDF + embeddings, RRF)** | **11/11** | **9/9** | **20/20** |
-
-  Hybrid scored 20/20 on both the real and synthetic datasets, median response time 9–13 s. The test set also
-  exposed problems that were then fixed: a missing knowledge file in the sample data, the model not knowing
-  today's date, and month names not matching "2026-01" style dates.
-
-### ⑦ Deployment: [`ui/web_chat.py`](../ui/web_chat.py), [`install_autostart.command`](../install_autostart.command)
-
-| Layer | What it does |
+| Measure | Result |
 |---|---|
-| **Local inference server** | Ollama hosts the LLM on the owner's MacBook (Apple M5, 16 GB); no cloud GPU or paid API |
-| **App server** | Python threaded HTTP server; streaming responses; one request to the model at a time (concurrency lock) |
-| **Front end** | Mobile-first chat UI built as a **Progressive Web App**: manifest, icons and service worker, so it installs on the home screen and runs full screen; supports dark mode |
-| **Authentication** | Password with constant-time comparison, HttpOnly/SameSite session cookies, and a lockout after repeated failures; the secret lives in a git-ignored `.env` |
-| **Network security** | Server listens on localhost only. **Tailscale Serve** provides HTTPS and access only from devices on the private network; the server also refuses any address outside localhost and Tailscale |
-| **Process management** | A macOS **launchd** agent starts it at login, restarts it if it crashes, and keeps the Mac awake on power |
-| **Privacy by design** | Real data is git-ignored; a **synthetic data generator** ([`pipelines/make_seed_data.py`](../pipelines/make_seed_data.py)) makes the public repo reproducible without exposing the business |
+| Document search (20-question golden set) | hit@1 **1.00** hybrid vs 0.90 keyword-only |
+| RAG assistant (23 questions, real and synthetic data) | **23/23** hybrid vs 16/20 keyword-only |
+| Text-to-SQL (50 questions, execution match), local Qwen3 8B | 34/50, the baseline for the Claude comparison |
+| Demand forecast, MAE in orders/night | LightGBM **3.52** vs 3.58 best baseline (noise floor 3.26); **3.13** vs 3.41 on rainy, event and bank-holiday nights |
+| Engineering | 81 pytest tests, 16 dbt tests, CI on every push, one-command rebuild in ~14 s |
 
-**Why not Docker or a paid API?** On macOS, Docker containers can't use the Apple GPU, so inference would be
-several times slower. A local model kept the project free and private.
+Insights from a year of the shop's real Uber Eats data:
+- **Peak:** Saturday night between 04:00 and 07:00.
+- **Funnel:** 90% of potential customers leave before opening the menu.
+- **Ratings:** slow deliveries (median 43 vs 35 minutes) go with 1–2 star ratings.
+- **Add-ons:** they're under-sold, at about 0.4 per order.
 
-## 5. Results
+## Technical scope
 
-- **Data:** a year of trading cleaned and checked: over 6,000 orders and 229 customer ratings.
-- **Insights the owners can act on:**
-  - Saturday night from 04:00 to 07:00 is the peak.
-  - 90% of potential customers leave before opening the menu.
-  - Slow deliveries (median 43 minutes vs 35) go with 1–2 star ratings.
-  - Add-ons are under-sold, at about 0.4 per order.
-- **Daily use:** the owners get answers in plain English in 10–30 seconds on their phones, at no running cost.
+| Area | Used |
+|---|---|
+| Generative AI | RAG, hybrid retrieval, embeddings, Text-to-SQL with self-correction, grounding and refusal, prompt design |
+| Evaluation | Golden sets (93 questions), execution-match scoring, hit@k and MRR, CI quality gates |
+| Data engineering | PostgreSQL, pgvector, dbt, data tests, deterministic synthetic data generation |
+| ML | LightGBM, rolling-origin backtesting, baselines, leakage tests, MLflow |
+| Backend and security | FastAPI, JWT roles, rate limiting, AST-level SQL validation, least-privilege database role, PII redaction |
+| Infrastructure | Docker Compose, GitHub Actions, launchd, Tailscale Serve |
 
-## 6. AI and ML concepts used
+## Next
 
-Retrieval-augmented generation (RAG) · hybrid search · TF-IDF sparse retrieval · dense retrieval · embeddings · cosine similarity · reciprocal rank fusion · top-k retrieval · chunking · open-weights
-LLM · 4-bit quantization · local / on-device inference · context window · system prompt · prompt engineering ·
-grounding · hallucination mitigation · evaluation (retrieval hit rate, answer accuracy) · temperature · response streaming · conversational memory ·
-backtesting · prediction intervals · feature engineering · synthetic data · data minimisation
+- **Claude via AWS Bedrock,** with model routing and a cost and latency comparison.
+- **A LangGraph agent** for "why" questions and courier analysis.
+- **Drafted actions** with human approval.
+- **A fine-tuned review classifier**, compared against a TF-IDF baseline.
+- **Guardrails and tracing, and a public demo** on synthetic data.
 
-## 7. Next steps
-
-- **Menu:** add the menu with prices to the knowledge base, using a vision model to read a photo of the menu.
-- **Re-ranking:** a cross-encoder re-ranker on top of hybrid search once the knowledge base grows.
-- **Better forecasts:** switch to daily data to capture weekly and seasonal patterns.
-- **Richer evaluation:** more test cases and an LLM acting as judge for open-ended answers.
-- **Server option:** a Docker image for running it on a server.
-
-## Try it
-
-The repo runs end to end on synthetic data. See the [README](../README.md).
+See the [roadmap](ROADMAP.md).

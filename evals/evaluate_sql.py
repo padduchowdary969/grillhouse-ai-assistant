@@ -3,6 +3,7 @@
 Run from the project root, with the database and the model available:
     python -m evals.evaluate_sql                    # default provider (local)
     python -m evals.evaluate_sql --provider bedrock
+    python -m evals.evaluate_sql --rescore           # re-check saved SQL after fixing a reference (no model calls)
 
 A case passes when every column of the reference result appears in the model's result with the same values
 (column names, extra columns and small rounding differences don't matter). When the reference returns a single
@@ -67,11 +68,28 @@ def matches(reference: list[tuple], candidate: list[tuple]) -> bool:
     return True
 
 
+def rescore(cases: list[dict], path: Path) -> None:
+    saved = pd.read_csv(path).set_index("id")
+    changed = 0
+    for case in cases:
+        reference = run(case["sql"])
+        got = run(saved.at[case["id"], "sql"]) if isinstance(saved.at[case["id"], "sql"], str) else None
+        ok = bool(got and got.error is None and matches(reference.rows, got.rows))
+        changed += ok != bool(saved.at[case["id"], "passed"])
+        saved.at[case["id"], "passed"] = ok
+    saved.reset_index().to_csv(path, index=False)
+    print(f"rescored {path}: {int(saved['passed'].sum())}/{len(saved)} correct ({changed} changed)")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--provider", default=None)
+    parser.add_argument("--rescore", action="store_true", help="re-run the saved SQL instead of asking the model")
     args = parser.parse_args()
     cases = [json.loads(line) for line in GOLDEN.read_text().splitlines() if line.strip()]
+    name = args.provider or "local"
+    if args.rescore:
+        return rescore(cases, RESULTS / f"sql_{name}.csv")
     rows = []
     for case in cases:
         reference = run(case["sql"])
@@ -86,7 +104,6 @@ def main() -> None:
 
     results = pd.DataFrame(rows)
     RESULTS.mkdir(parents=True, exist_ok=True)
-    name = args.provider or "local"
     results.to_csv(RESULTS / f"sql_{name}.csv", index=False)
     print(f"\nprovider {name}: {results['passed'].sum()}/{len(results)} correct "
           f"({100 * results['passed'].mean():.0f}%), median {results['latency_s'].median():.0f}s, "
