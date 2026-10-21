@@ -68,6 +68,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: docker/setup-qemu-action@v3   # arm64 builds on the amd64 runner
+
       - uses: docker/setup-buildx-action@v3
 
       - name: Log in to GitHub Container Registry
@@ -95,6 +97,8 @@ jobs:
         with:
           context: .
           target: ${{ matrix.target }}
+          # Published images run natively on Intel/AMD and ARM (Apple silicon, Graviton); PR builds stay amd64-only
+          platforms: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           load: ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/main') }}
           tags: ${{ steps.meta.outputs.tags }}
