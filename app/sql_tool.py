@@ -1,4 +1,4 @@
-"""The copilot's SQL tool: validate a model-written query, then run it as the read-only database user.
+"""The assistant's SQL tool: validate a model-written query, then run it as the read-only database user.
 
 Two independent layers of protection:
   1. validate() parses the query with sqlglot and allows only one read-only SELECT over the approved

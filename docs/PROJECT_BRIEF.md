@@ -1,4 +1,4 @@
-# Grill House Ops Copilot: Project Brief
+# Grill House AI Assistant: Project Brief
 
 *A one-page summary for reviewers. The full detail is in the [README](../README.md),
 [Architecture](ARCHITECTURE.md), [Design decisions](DESIGN_DECISIONS.md) and [Evaluation](EVALUATION.md).*

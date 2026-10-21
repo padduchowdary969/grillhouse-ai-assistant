@@ -1,6 +1,6 @@
 <div align="center">
 
-# Grill House AI assistant 
+# Grill House AI Assistant
 
 **An AI analyst for a real late-night takeaway in Manchester.** It answers questions about sales, deliveries,
 menu and reviews in plain English, grounded in the shop's own data, and runs in daily use on the owners' phones.
@@ -22,7 +22,7 @@ menu and reviews in plain English, grounded in the shop's own data, and runs in 
 
 The shop trades from 18:00 to 08:00 and sells through Uber Eats. Its numbers sit in separate platform exports
 that are hard to read mid-shift, and they're grouped by calendar day, which splits every night's trade in two.
-This project turns those exports into a copilot the owners can ask things like:
+This project turns those exports into an assistant the owners can ask things like:
 
 > *"What should I prep for Saturday night?"* · *"Why did orders drop in the week of 10 November?"* ·
 > *"Which time slots get the most courier delays?"* · *"Is the chicken halal?"*
@@ -252,7 +252,7 @@ python -m evals.evaluate_chatbot                    # 23-question RAG assistant 
 ## Security and privacy
 
 - **Two kinds of data:** real business data lives only in the git-ignored `data/` folder and never enters an image (`.dockerignore`), the database or CI. The public repo contains synthetic data only.
-- **Database permissions:** the copilot connects as `copilot_readonly`. It can `SELECT` from `analytics` only, can't see `raw`, runs in read-only transactions and is cancelled after 5 seconds.
+- **Database permissions:** the assistant connects as `copilot_readonly`. It can `SELECT` from `analytics` only, can't see `raw`, runs in read-only transactions and is cancelled after 5 seconds.
 - **Query validation:** before any query reaches the database, sqlglot rejects stacked statements, writes (including inside CTEs), system catalogs and `pg_*` functions, and caps results at 200 rows.
 - **PII redaction:** names, phone numbers, emails, postcodes and street addresses are masked before storage. The synthetic data includes test cases for redaction, and prompt-injection attempts for the planned guardrails.
 - **Access control:** HttpOnly session cookies (Secure over HTTPS), JWT roles, a wrong-password lockout, and per-user rate limits. In the shop's private deployment, only the Mac itself and the Tailscale network can connect.

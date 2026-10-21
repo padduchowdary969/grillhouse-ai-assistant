@@ -1,4 +1,4 @@
-"""Security boundary of the copilot's database user. Skipped when the database isn't running."""
+"""Security boundary of the assistant's database user. Skipped when the database isn't running."""
 
 import psycopg
 import pytest

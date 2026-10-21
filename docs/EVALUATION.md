@@ -1,6 +1,6 @@
 # Evaluation
 
-Every model-facing part of the copilot has a golden set, a scorer and a recorded result. Numbers below are from
+Every model-facing part of the assistant has a golden set, a scorer and a recorded result. Numbers below are from
 the synthetic demo dataset unless marked otherwise, measured on 20 October 2026.
 
 | Golden set | Size | What is scored | Needs a model | In CI |

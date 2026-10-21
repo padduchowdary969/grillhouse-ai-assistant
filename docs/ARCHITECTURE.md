@@ -1,6 +1,6 @@
 # Architecture
 
-How the Grill House Ops Copilot is built, from raw exports to an answer on a phone.
+How the Grill House AI Assistant is built, from raw exports to an answer on a phone.
 
 - [Process map](#process-map)
 - [System components](#system-components)
@@ -138,7 +138,7 @@ The patterns are hand-tuned, not fitted to the shop's real data, so nothing priv
 
 ## Data model
 
-`raw` holds tables as loaded. `analytics` holds the dbt models, which are the only tables the copilot can query.
+`raw` holds tables as loaded. `analytics` holds the dbt models, which are the only tables the assistant can query.
 
 ```mermaid
 erDiagram

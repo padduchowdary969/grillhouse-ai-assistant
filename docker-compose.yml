@@ -1,4 +1,4 @@
-# Grill House Ops Copilot: the full demo stack on synthetic data
+# Grill House AI Assistant: the full demo stack on synthetic data
 #
 #   cp .env.example .env      # set the passwords
 #   docker compose up         # db -> setup (loads data, runs dbt + forecast, exits) -> api on http://localhost:8000

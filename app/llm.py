@@ -1,4 +1,4 @@
-"""One interface for every model the copilot can call, so tasks can be routed and compared by cost and latency.
+"""One interface for every model the assistant can call, so tasks can be routed and compared by cost and latency.
 
     from app.llm import get_provider
     reply = get_provider("bedrock").complete(system="...", user="...")

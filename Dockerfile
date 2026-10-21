@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 #
-# Grill House Ops Copilot: two images from one Dockerfile
+# Grill House AI Assistant: two images from one Dockerfile
 #
 #   docker build --target pipeline -t grillhouse-pipeline .   data, ML and evaluation jobs
 #   docker build --target api      -t grillhouse-api .        the FastAPI app and phone UI, with demo data baked in

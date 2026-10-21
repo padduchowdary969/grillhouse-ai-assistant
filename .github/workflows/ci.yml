@@ -90,7 +90,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
           labels: |
             org.opencontainers.image.title=grillhouse-${{ matrix.target }}
-            org.opencontainers.image.description=Grill House Ops Copilot (${{ matrix.target }} image), synthetic demo data only
+            org.opencontainers.image.description=Grill House AI Assistant (${{ matrix.target }} image), synthetic demo data only
 
       - name: Build${{ github.ref == 'refs/heads/main' && ' and push' || '' }}
         uses: docker/build-push-action@v6

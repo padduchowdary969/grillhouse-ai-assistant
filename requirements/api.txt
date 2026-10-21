@@ -1,4 +1,4 @@
-# What the copilot API needs at runtime (the grillhouse-api image)
+# What the assistant API needs at runtime (the grillhouse-api image)
 pandas>=3.0,<4
 numpy>=2.4,<3
 psycopg[binary]>=3.3,<4

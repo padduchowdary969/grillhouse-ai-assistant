@@ -8,4 +8,4 @@ clean-targets: ["target", "logs"]
 
 models:
   grillhouse:
-    +materialized: table   # the copilot's read-only user queries these in schema `analytics`
+    +materialized: table   # the assistant's read-only user queries these in schema `analytics`

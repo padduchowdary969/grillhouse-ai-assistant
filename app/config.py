@@ -21,7 +21,7 @@ DB_NAME = os.environ.get("GRILLHOUSE_DB_NAME", "grillhouse")
 
 
 def db_url(readonly: bool = False) -> str:
-    """Connection string for the loader (owner) or for the copilot's SQL tool (read-only)."""
+    """Connection string for the loader (owner) or for the assistant's SQL tool (read-only)."""
     if readonly:
         user, password = "copilot_readonly", os.environ.get("GRILLHOUSE_READONLY_PASSWORD", "")
     else:

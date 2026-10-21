@@ -7,7 +7,7 @@ set -euo pipefail
 psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ro_password="$GRILLHOUSE_READONLY_PASSWORD" <<'SQL'
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE SCHEMA IF NOT EXISTS raw;        -- tables as loaded from seed_data/
-CREATE SCHEMA IF NOT EXISTS analytics;  -- dbt models the copilot queries
+CREATE SCHEMA IF NOT EXISTS analytics;  -- dbt models the assistant queries
 
 CREATE ROLE copilot_readonly LOGIN PASSWORD :'ro_password';
 ALTER ROLE copilot_readonly SET default_transaction_read_only = on;

@@ -1,4 +1,4 @@
-"""Copilot backend: authentication, rate limits, request logging and the copilot's tools as HTTP endpoints.
+"""Assistant backend: authentication, rate limits, request logging and the assistant's tools as HTTP endpoints.
 
 Run from the project root:
     uvicorn app.api:app --port 8000          # docs at http://localhost:8000/docs
@@ -50,7 +50,7 @@ NETWORKS = {"private": ["127.0.0.0/8", "::1/128", "100.64.0.0/10", "fd7a:115c:a1
 _allowed = os.environ.get("GRILLHOUSE_ALLOWED_NETWORKS", "")
 ALLOWED_NETWORKS = [ipaddress.ip_network(n) for n in NETWORKS.get(_allowed, _allowed.split(",") if _allowed else [])]
 
-app = FastAPI(title="Grill House Ops Copilot", version="0.2.0",
+app = FastAPI(title="Grill House AI Assistant", version="0.2.0",
               description="AI analyst for a late-night takeaway: Text-to-SQL over sales and deliveries, cited menu "
                           "and policy search. Demo data is synthetic.")
 bearer = HTTPBearer(auto_error=False)
@@ -219,21 +219,21 @@ def health() -> dict:
     return {"ok": all(checks.values()), **checks}
 
 
-@app.post("/search", response_model=SearchResponse, tags=["copilot"])
+@app.post("/search", response_model=SearchResponse, tags=["assistant"])
 def search_documents(body: Question, user: dict = Depends(current_user)) -> SearchResponse:
     """Menu and policy search (pgvector + BM25) with source citations."""
     return SearchResponse(hits=[Citation(citation=h.citation, content=h.content, score=h.score)
                                 for h in search(body.question)])
 
 
-@app.post("/sql", response_model=SQLResponse, tags=["copilot"])
+@app.post("/sql", response_model=SQLResponse, tags=["assistant"])
 def run_sql(body: SQLRequest, user: dict = Depends(owner_only)) -> SQLResponse:
     """Run a validated, read-only query directly (owners only)."""
     result = run(body.sql)
     return SQLResponse(sql=result.sql, columns=result.columns, rows=[list(r) for r in result.rows], error=result.error)
 
 
-@app.post("/ask/sql", response_model=SQLAnswer, tags=["copilot"])
+@app.post("/ask/sql", response_model=SQLAnswer, tags=["assistant"])
 def ask_sql(body: Question, request: Request, user: dict = Depends(rate_limited)) -> SQLAnswer:
     """Answer a question about sales, orders or deliveries with Text-to-SQL."""
     answer = ask(body.question)
@@ -271,7 +271,7 @@ class QueueWriter:
         pass
 
 
-@app.post("/chat", tags=["copilot"])
+@app.post("/chat", tags=["assistant"])
 def chat(body: Question, user: dict = Depends(rate_limited)) -> StreamingResponse:
     """The phone app's assistant: retrieval-augmented answers from the reports, streamed as they're written."""
     history = chat_histories.setdefault(user.get("sid", user["sub"]), [])

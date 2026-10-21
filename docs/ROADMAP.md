@@ -1,4 +1,4 @@
-# Roadmap: Grill House Ops Copilot
+# Roadmap: Grill House AI Assistant
 
 An AI analyst for a real Manchester burger shop that answers "why" questions about sales and deliveries, then
 drafts the follow-up actions. This roadmap adapts the original portfolio project plan to what is already
@@ -35,7 +35,7 @@ built and to the decisions below.
 | `pipelines/forecast_ubereats.py` | Baseline models in the forecaster backtest |
 | `app/chatbot.py` hybrid retriever (TF-IDF + embeddings, RRF) | Retriever tool, moved to pgvector + BM25 |
 | `evals/evaluate_chatbot.py` (23 questions, 23/23) | `evals/` golden set, grown to 50+, gate in CI |
-| `ui/web_chat.py` + PWA + Tailscale | `ui/` + FastAPI backend; private shop deployment |
+| Standalone chat server + PWA + Tailscale | PWA in `ui/static/`, served by the FastAPI backend (old server removed 21 Oct 2026) |
 
 ## Phase 1: Data foundation (weeks 1–2)
 
@@ -55,7 +55,7 @@ database from empty in about 14 seconds; 19 dbt tests and 29 pytest tests pass.
 
 Notes: the generator uses hand-tuned patterns rather than the real data as input, so nothing private can leak;
 `delivery_performance` is covered by the `orders` model (lateness per order) and `daily_sales` (per night);
-the read-only copilot user and its limits were set up here, ahead of Phase 2.
+the assistant's read-only database user and its limits were set up here, ahead of Phase 2.
 
 ## Phase 2: Q&A and search → public demo (weeks 3–4)
 
