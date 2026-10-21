@@ -29,7 +29,7 @@ Uber Eats exports / synthetic orders + Manchester weather + bank holidays
   → clean (trading nights) → PII redaction (Presidio) → PostgreSQL raw
   → dbt analytics models (16 data tests) → embeddings (pgvector) → LightGBM forecast (MLflow)
   → FastAPI: JWT roles · rate limits · /chat (RAG) · /ask/sql (Text-to-SQL) · /search (citations)
-  → model layer: Qwen3 8B on Ollama today, Claude via AWS Bedrock next
+  → model layer: Qwen3 8B on Ollama (Claude via Amazon Bedrock available as an optional provider)
 ```
 
 Model-written SQL passes two independent checks: a sqlglot validator (one `SELECT`, approved tables only, no writes
@@ -43,7 +43,7 @@ or system functions, row cap), then a read-only, time-limited database role.
 | RAG assistant (23 questions, real and synthetic data) | **23/23** hybrid vs 16/20 keyword-only |
 | Text-to-SQL (50 questions, execution match), local Qwen3 8B | 34/50, the baseline for the Claude comparison |
 | Demand forecast, MAE in orders/night | LightGBM **3.52** vs 3.58 best baseline (noise floor 3.26); **3.13** vs 3.41 on rainy, event and bank-holiday nights |
-| Engineering | 81 pytest tests, 16 dbt tests, CI on every push, one-command rebuild in ~14 s |
+| Engineering | 84 pytest tests, 16 dbt tests, CI on every push, versioned Docker images, full stack from empty in under 30 s |
 
 Insights from a year of the shop's real Uber Eats data:
 - **Peak:** Saturday night between 04:00 and 07:00.
@@ -60,11 +60,10 @@ Insights from a year of the shop's real Uber Eats data:
 | Data engineering | PostgreSQL, pgvector, dbt, data tests, deterministic synthetic data generation |
 | ML | LightGBM, rolling-origin backtesting, baselines, leakage tests, MLflow |
 | Backend and security | FastAPI, JWT roles, rate limiting, AST-level SQL validation, least-privilege database role, PII redaction |
-| Infrastructure | Docker Compose, GitHub Actions, launchd, Tailscale Serve |
+| Infrastructure | Multi-stage non-root Docker images on GHCR, Docker Compose, GitHub Actions, launchd, Tailscale Serve |
 
 ## Next
 
-- **Claude via AWS Bedrock,** with model routing and a cost and latency comparison.
 - **A LangGraph agent** for "why" questions and courier analysis.
 - **Drafted actions** with human approval.
 - **A fine-tuned review classifier**, compared against a TF-IDF baseline.

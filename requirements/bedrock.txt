@@ -1,0 +1,2 @@
+# Optional: Claude via Amazon Bedrock (app/llm.py BedrockProvider; paused for now)
+anthropic[bedrock]>=1.17,<2

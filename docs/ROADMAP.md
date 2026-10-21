@@ -8,7 +8,7 @@ built and to the decisions below.
 
 | Question | Decision |
 |---|---|
-| Main LLM | Claude via AWS Bedrock, routing simple high-volume tasks to a fine-tuned Llama 3 8B |
+| Main LLM | Claude via Amazon Bedrock, routing simple high-volume tasks to a fine-tuned Llama 3 8B. **Paused 21 Oct 2026:** the provider is built and unit-tested; live runs wait until AWS is back in the plan |
 | Order-level data | Synthetic: orders, items and deliveries generated to match the real Uber Eats summaries. Real data stays as summaries, private |
 | Live demo | Public, on synthetic data only. The shop's own app with real data stays private (Tailscale) |
 | Time | 10+ hours a week, four phases of about two weeks |
@@ -50,7 +50,7 @@ built and to the decisions below.
 - [x] dbt models for clean marts (`daily_sales`, `item_sales`, `delivery_performance`)
 - [x] Pytest for the pipeline and generator; `docker compose up` loads everything
 
-**Gate: data loads cleanly with one command.** ✅ Passed 20 Oct 2026: `docker compose up setup` builds the
+**Gate: data loads cleanly with one command.** ✅ Passed 20 Oct 2026: `docker compose up` builds the
 database from empty in about 14 seconds; 19 dbt tests and 29 pytest tests pass.
 
 Notes: the generator uses hand-tuned patterns rather than the real data as input, so nothing private can leak;
@@ -61,7 +61,8 @@ the read-only copilot user and its limits were set up here, ahead of Phase 2.
 
 - [x] FastAPI backend: JWT with roles, per-user rate limits, request logging; the PWA now runs on it (cookie
       sign-in, streamed /chat, private-network mode for the shop)
-- [ ] Claude via Bedrock: client, model routing stub, cost and latency logging per request
+- [~] Claude via Bedrock: provider with refusal fallback, cost and latency logging, built and unit-tested
+      (live runs paused with AWS)
 - [x] Text-to-SQL tool: read-only database user, SQL allowlist (SELECT only, no system tables), query
       validation, exact-match checks in evals (50-question golden set; local Qwen3 8B: 34/50)
 - [x] Retriever on pgvector + BM25 with citations (RRF fusion); menu and policy documents. Cross-encoder
@@ -71,6 +72,9 @@ the read-only copilot user and its limits were set up here, ahead of Phase 2.
 - [x] Golden sets: 93 questions (50 Text-to-SQL, 20 document search, 23 RAG). GitHub Actions runs the pipeline,
       dbt tests, pytest and a search-quality gate on every push; model-graded evals join CI with Bedrock
 - [ ] Public demo on synthetic data (Hugging Face Spaces or Render) with a spending cap and rate limit
+
+- [x] Docker images (21 Oct 2026): multi-stage `pipeline` and `api` images, non-root, published to GHCR by CI;
+      `docker compose up` runs db → setup → api with health checks
 
 **Gate: demo-ready — answers real questions publicly.**
 
@@ -99,7 +103,7 @@ the read-only copilot user and its limits were set up here, ahead of Phase 2.
       table, cost per query
 - [ ] Pin the repo; LinkedIn post
 
-## Before Phase 2: Bedrock setup (owner's task)
+## Bedrock setup (owner's task, paused 21 Oct 2026)
 
 1. AWS account with a **budget alarm** (e.g. £10/month) and an IAM user limited to Bedrock
 2. Enable Anthropic Claude models in the Bedrock console for one region (e.g. `eu-west-2` London, if offered)

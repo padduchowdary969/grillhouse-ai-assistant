@@ -1,0 +1,9 @@
+# What the copilot API needs at runtime (the grillhouse-api image)
+pandas>=3.0,<4
+numpy>=2.4,<3
+psycopg[binary]>=3.3,<4
+fastapi>=0.156,<1
+uvicorn[standard]>=0.54,<1
+pyjwt>=2.15,<3
+sqlglot>=30.24,<31
+rank-bm25>=0.2.2,<0.3

@@ -9,3 +9,11 @@ dbt/logs/
 seed_data/clean/
 seed_data/reports/
 .git/
+logs/
+mlruns/
+docs/
+tests/
+scripts/
+.github/
+*.md
+!seed_data/knowledge/*.md

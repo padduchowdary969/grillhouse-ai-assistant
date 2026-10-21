@@ -1,6 +1,20 @@
-# One command builds everything: docker compose up setup
-#   db     PostgreSQL 17 + pgvector (passwords from the git-ignored .env, see .env.example)
-#   setup  generates the synthetic dataset, loads it and builds the dbt models, then exits
+# Grill House Ops Copilot: the full demo stack on synthetic data
+#
+#   cp .env.example .env      # set the passwords
+#   docker compose up         # db -> setup (loads data, runs dbt + forecast, exits) -> api on http://localhost:8000
+#
+# The api answers questions with a model served by Ollama on the host (ollama pull qwen3:8b nomic-embed-text);
+# everything else works without it.
+
+name: grillhouse
+
+x-db-credentials: &db-credentials
+  GRILLHOUSE_DB_HOST: db
+  GRILLHOUSE_DB_PORT: "5432"
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+  GRILLHOUSE_READONLY_PASSWORD: ${GRILLHOUSE_READONLY_PASSWORD:?set GRILLHOUSE_READONLY_PASSWORD in .env}
+  OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+
 services:
   db:
     image: pgvector/pgvector:pg17
@@ -10,7 +24,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       GRILLHOUSE_READONLY_PASSWORD: ${GRILLHOUSE_READONLY_PASSWORD:?set GRILLHOUSE_READONLY_PASSWORD in .env}
     ports:
-      - "127.0.0.1:5433:5432"  # this machine only
+      - "127.0.0.1:5433:5432"   # this machine only
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d:ro
@@ -19,21 +33,37 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+    restart: unless-stopped
 
   setup:
-    build: .
+    image: ${IMAGE_PREFIX:-grillhouse}-pipeline:${IMAGE_TAG:-local}
+    build:
+      context: .
+      target: pipeline
     depends_on:
       db:
         condition: service_healthy
     environment:
-      GRILLHOUSE_DB_HOST: db
-      GRILLHOUSE_DB_PORT: "5432"
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      GRILLHOUSE_READONLY_PASSWORD: ${GRILLHOUSE_READONLY_PASSWORD}
-      # Ollama on the host, for document embeddings; without it search falls back to keywords
-      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      <<: *db-credentials
     volumes:
-      - ./mlruns:/app/mlruns   # experiment tracking survives the container
+      - ./mlruns:/app/mlruns     # experiment tracking survives the container
+
+  api:
+    image: ${IMAGE_PREFIX:-grillhouse}-api:${IMAGE_TAG:-local}
+    build:
+      context: .
+      target: api
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    environment:
+      <<: *db-credentials
+      GRILLHOUSE_PASSWORD: ${GRILLHOUSE_PASSWORD:?set GRILLHOUSE_PASSWORD in .env}
+      GRILLHOUSE_JWT_SECRET: ${GRILLHOUSE_JWT_SECRET:?set GRILLHOUSE_JWT_SECRET in .env}
+      GRILLHOUSE_REQUEST_LOG: /app/logs/requests.jsonl
+    ports:
+      - "127.0.0.1:8000:8000"   # this machine only
+    restart: unless-stopped
 
 volumes:
   pgdata:

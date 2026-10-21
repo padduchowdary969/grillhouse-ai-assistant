@@ -105,7 +105,7 @@ flowchart TB
 
 ## Data pipeline
 
-`python -m pipelines.run_all` (or `docker compose up setup`) runs every step in order and stops at the first failure.
+`python -m pipelines.run_all` (or the `setup` container in `docker compose up`) runs every step in order and stops at the first failure.
 
 ```mermaid
 flowchart LR
@@ -291,10 +291,10 @@ flowchart LR
         ld["launchd agent<br/>start at login · restart · keep awake"] -. manages .-> uv
     end
 
-    subgraph public["Public · demo (synthetic data)"]
-        visitor["Recruiters · reviewers"] --> host["Hosted container (planned)<br/>rate limits + spending cap"]
+    subgraph public["Public · demo stack (synthetic data)"]
+        visitor["Anyone with Docker"] --> host["docker compose up<br/>grillhouse-api + grillhouse-pipeline<br/>images from GHCR"]
         host --> pgd[("Postgres + pgvector<br/>seed_data/")]
-        host --> br["Claude via Bedrock"]
+        host --> ol2["Ollama on the host"]
     end
 ```
 
@@ -305,6 +305,13 @@ flowchart LR
    if it stops, and keeps the Mac awake on power. `scripts/macos/install_autostart.command remove` undoes it.
 3. Run `tailscale serve --bg 8501` once. Devices signed in to the same tailnet open
    `https://<mac-name>.<tailnet>.ts.net` and add it to the home screen.
+
+**Containers (demo stack):** `docker compose up` runs three services:
+- **`db`:** Postgres + pgvector, with a health check.
+- **`setup`:** the pipeline image; it loads data, runs the dbt tests and the forecast, then exits.
+- **`api`:** the API image on `127.0.0.1:8000`, with a health check; it starts only after `setup` succeeds.
+
+See [README § Docker images](../README.md#docker-images).
 
 **Local development:** `docker compose up -d db`, then `uvicorn app.api:app --port 8000`.
 
@@ -318,9 +325,14 @@ flowchart LR
     deps --> build["pipelines.run_all<br/>seed → clean → load → dbt tests → LightGBM"]
     build --> drift{"seed_data/ identical<br/>to the committed copy?"}
     drift -- no --> fail["❌ fail"]
-    drift -- yes --> tests["pytest: 81 tests incl.<br/>SQL guard, API auth, redaction,<br/>search-quality floors"]
-    tests --> pass["✅ pass"]
+    drift -- yes --> tests["pytest: 84 tests incl.<br/>SQL guard, API auth, redaction,<br/>search-quality floors"]
+    tests --> images["Build pipeline + api images<br/>smoke test: imports, non-root,<br/>no secrets or private data"]
+    images --> push{"on main?"}
+    push -- yes --> ghcr["Push to GHCR<br/>:latest · :sha-commit"]
+    push -- no --> pass["✅ pass"]
+    ghcr --> pass
 ```
 
 CI has no model server, so search is gated on its keyword-only scores, and the model-graded evaluations
-(Text-to-SQL, assistant) run locally until the Bedrock provider is in place.
+(Text-to-SQL, assistant) run locally. The image job runs only after the tests pass, so a published image
+always comes from a green commit.

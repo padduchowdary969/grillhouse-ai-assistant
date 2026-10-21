@@ -1,0 +1,4 @@
+# Everything, plus test tools (local development and CI)
+-r pipeline.txt
+pytest>=9.1,<10
+httpx>=0.28,<1

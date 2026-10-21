@@ -40,7 +40,7 @@ by real Manchester weather and UK bank holidays.
 | 📏 **Measured, not assumed** | 93-question golden sets with execution-match scoring; search quality gated in CI |
 | 📈 **Forecasting** | LightGBM demand model, rolling-origin backtest against baselines, tracked in MLflow, turned into a buns-and-patties order |
 | 📱 **In real use** | Installable phone app (PWA) behind Tailscale with JWT sessions, auto-started on the shop's Mac |
-| ⚙️ **Reproducible** | `docker compose up setup` builds the database from empty in about 14 seconds; CI on every push |
+| ⚙️ **Reproducible** | `docker compose up` runs the whole stack from empty in under 30 seconds; versioned images published by CI |
 
 ## Results
 
@@ -49,9 +49,9 @@ by real Manchester weather and UK bank holidays.
 | Document search, hybrid (20 questions) | **hit@1 1.00**, MRR 1.00 (keyword-only: hit@1 0.90) |
 | RAG assistant, hybrid search (23 questions) | **23/23** on real and synthetic data (keyword-only: 16/20) |
 | Text-to-SQL, local Qwen3 8B (50 questions, execution match) | 34/50 (68%) |
-| Text-to-SQL, Claude via AWS Bedrock | *in progress* |
+| Text-to-SQL, Claude via Amazon Bedrock | provider built and unit-tested; live run paused |
 | Demand forecast, LightGBM vs best baseline (orders/night MAE) | **3.52** vs 3.58 overall · **3.13** vs 3.41 on rainy, event and bank-holiday nights |
-| Tests | 81 pytest tests · 16 dbt data tests · all passing in CI |
+| Tests | 84 pytest tests · 16 dbt data tests · all passing in CI |
 
 Details and failure analysis: [docs/EVALUATION.md](docs/EVALUATION.md).
 
@@ -75,7 +75,7 @@ flowchart TB
     subgraph models["Model layer"]
         router["Provider interface · routing"]
         local["Ollama: Qwen3 8B + nomic-embed-text"]
-        bedrock["Claude via AWS Bedrock (Phase 2)"]
+        bedrock["Claude via Amazon Bedrock (optional)"]
     end
 
     subgraph data["Data layer"]
@@ -137,14 +137,14 @@ sequenceDiagram
 | Language and data | Python 3.12, pandas, NumPy |
 | Storage and transformation | PostgreSQL 17, pgvector (HNSW), dbt-core 1.12 + dbt-postgres |
 | Retrieval | BM25 (rank-bm25), nomic-embed-text embeddings, reciprocal rank fusion |
-| Models | Qwen3 8B on Ollama (local); Claude via AWS Bedrock (in progress) |
+| Models | Qwen3 8B on Ollama (local); Claude via Amazon Bedrock (optional provider, paused) |
 | Text-to-SQL safety | sqlglot (AST validation), Postgres read-only role with statement timeout |
 | Privacy | Microsoft Presidio + spaCy, custom UK phone, postcode and address recognisers |
 | Forecasting and tracking | LightGBM, scikit-learn, MLflow (SQLite store) |
 | Backend and app | FastAPI, Uvicorn, PyJWT, Pydantic; vanilla JS PWA |
 | Context data | Open-Meteo (Manchester weather history), gov.uk bank holidays |
-| Infrastructure | Docker Compose, GitHub Actions, macOS launchd, Tailscale Serve (HTTPS, private network) |
-| Testing | pytest (81), dbt data tests (16), golden-set evaluators |
+| Infrastructure | Docker (multi-stage, non-root images on GHCR), Docker Compose, GitHub Actions, macOS launchd, Tailscale Serve |
+| Testing | pytest (84), dbt data tests (16), golden-set evaluators |
 
 ## Quick start
 
@@ -152,22 +152,54 @@ sequenceDiagram
 git clone https://github.com/padduchowdary969/grillhouse-ai-assistant.git
 cd grillhouse-ai-assistant
 cp .env.example .env                  # set the passwords
-docker compose up setup               # Postgres + pgvector, synthetic data, dbt models + tests, forecast
+docker compose up                     # database → data load, dbt tests, forecast → API on http://localhost:8000
 ```
 
-Then run the API and tests locally:
+Open http://localhost:8000 for the phone app, or http://localhost:8000/docs for the interactive API. The
+assistant (`/chat`) and Text-to-SQL (`/ask/sql`) need a model: install [Ollama](https://ollama.com) on the host and
+run `ollama pull qwen3:8b` and `ollama pull nomic-embed-text`. Search, validated SQL and everything else work
+without it.
+
+**Run the published images instead of building:**
+
+```bash
+IMAGE_PREFIX=ghcr.io/padduchowdary969/grillhouse IMAGE_TAG=latest docker compose up --no-build
+```
+
+**Develop locally:**
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt       # everything (requirements/ splits it per image)
 docker compose up -d db
-python -m pytest                      # 81 tests
-uvicorn app.api:app --port 8000       # interactive API docs at http://localhost:8000/docs
+python -m pipelines.run_all
+python -m pytest                      # 84 tests
+uvicorn app.api:app --port 8000
 ```
 
-The assistant and Text-to-SQL endpoints need a model: install [Ollama](https://ollama.com), then
-`ollama pull qwen3:8b` and `ollama pull nomic-embed-text`. On macOS, LightGBM needs OpenMP (`brew install libomp`);
-the Docker image already includes it.
+On macOS, LightGBM needs OpenMP (`brew install libomp`); the images already include it.
+
+## Docker images
+
+One multi-stage [`Dockerfile`](Dockerfile) builds two images. CI builds both on every run and publishes them to
+GitHub Container Registry from `main`, tagged `latest` and `sha-<commit>`.
+
+| Image | Contents | Size |
+|---|---|---|
+| `ghcr.io/padduchowdary969/grillhouse-pipeline` | Seed-data generator, cleaning, PII redaction, DB load, dbt, LightGBM + MLflow, evaluators | ~1.8 GB (dbt, spaCy, LightGBM) |
+| `ghcr.io/padduchowdary969/grillhouse-api` | FastAPI backend and phone app, with the synthetic demo reports pre-built in a separate stage | ~0.5 GB |
+
+```mermaid
+flowchart LR
+    base["base<br/>python:3.12.15-slim-bookworm<br/>non-root user 10001"] --> pipeline["pipeline<br/>requirements/pipeline.txt<br/>+ libgomp"]
+    pipeline --> demo["demo-data<br/>run_all --no-db"]
+    base --> api["api<br/>requirements/api.txt"]
+    demo -- "seed_data/ reports" --> api
+```
+
+- **Small surface:** the API image installs only `requirements/api.txt`, with no dbt, spaCy or LightGBM.
+- **Safe by default:** both images run as a non-root user, and `.dockerignore` keeps `.env`, `data/`, tests and docs out. The CI smoke test fails if either image runs as root or contains secrets or private data.
+- **Compose order:** `docker compose up` waits for a healthy database, runs `setup` to completion, then starts `api` with a health check. Ports bind to `127.0.0.1` only.
 
 <details>
 <summary><b>Run each pipeline step yourself</b></summary>
@@ -260,7 +292,7 @@ For the private phone app on a Mac, see [docs/ARCHITECTURE.md § Deployment](doc
 | Phase | Status |
 |---|---|
 | 1. Data foundation: schema, synthetic data, PII redaction, dbt, one-command setup | ✅ Done |
-| 2. Q&A and search: Text-to-SQL, hybrid retrieval, FastAPI, LightGBM, CI, golden sets | 🟡 Bedrock and public demo remaining |
+| 2. Q&A and search: Text-to-SQL, hybrid retrieval, FastAPI, LightGBM, CI, golden sets, Docker images | ✅ Done (Bedrock live run and public demo paused) |
 | 3. Agent and actions: LangGraph "why" agent, courier analysis, drafts with human approval, review classifier | ⬜ Next |
 | 4. Prove and ship: Ragas/DeepEval, guardrails, RBAC, Langfuse tracing, demo video | ⬜ Planned |
 
