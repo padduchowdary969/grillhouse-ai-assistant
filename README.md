@@ -12,7 +12,7 @@ menu and reviews in plain English, grounded in the shop's own data, and runs in 
 ![dbt](https://img.shields.io/badge/dbt-1.12-FF694B?logo=dbt&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
-[Architecture](docs/ARCHITECTURE.md) · [Design decisions](docs/DESIGN_DECISIONS.md) · [Evaluation](docs/EVALUATION.md) · [Roadmap](docs/ROADMAP.md) · [Project brief](docs/PROJECT_BRIEF.md)
+[Complete guide](docs/PROJECT_GUIDE.md) · [Architecture](docs/ARCHITECTURE.md) · [Design decisions](docs/DESIGN_DECISIONS.md) · [Evaluation](docs/EVALUATION.md) · [Learning labs](labs/README.md) · [Project brief](docs/PROJECT_BRIEF.md)
 
 </div>
 
@@ -265,11 +265,22 @@ pipelines/    seed-data generator, context fetch, cleaning, PII redaction, DB lo
 dbt/          analytics models and data tests
 db/           schema and database roles
 evals/        golden sets, evaluators, results
+labs/         six hands-on labs on how LLMs work with data
 ui/           phone app (PWA) and icons
 tests/        pytest suite
 seed_data/    synthetic dataset (public)
 scripts/      macOS launcher and auto-start installer for the private deployment
-docs/         architecture, design decisions, evaluation, roadmap, project brief
+docs/         complete guide, architecture, design decisions, evaluation, roadmap, project brief
+```
+
+## Learn how it works
+
+Six short [labs](labs/README.md) open the system up one idea at a time, on synthetic data with a local model:
+what the model actually sees, embeddings, retrieval, grounding (and hallucination), Text-to-SQL step by step,
+and evaluation.
+
+```bash
+python -m labs.lab1_what_the_model_sees "What should I prep for Saturday night?"
 ```
 
 ## Use it with your own Uber Eats data

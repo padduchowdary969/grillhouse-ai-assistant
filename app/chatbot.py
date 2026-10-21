@@ -218,7 +218,8 @@ def ask_model(messages: list[dict], stream_to=sys.stdout) -> str:
     return "".join(reply).strip()
 
 
-def answer(question: str, retriever: Retriever, history: list[dict], stream_to=sys.stdout) -> str:
+def build_messages(question: str, retriever: Retriever, history: list[dict]) -> list[dict]:
+    """Everything the model is given for one question: rules, today's date, facts found by search, recent turns."""
     found = retriever.search(question)
     # Always-on facts (opening hours) go in the instructions, where a small model is less likely to skip them
     always = "\n\n".join(body for title, body in found if title in ALWAYS_INCLUDE)
@@ -230,9 +231,12 @@ def answer(question: str, retriever: Retriever, history: list[dict], stream_to=s
     system = (SYSTEM_PROMPT + f"\n\nToday is {date.today():%A %d %B %Y}. Months in the tables are written YYYY-MM"
               " (2026-01 means January 2026); \"next month\" means the first month in the forecast."
               + (f"\n\nShop details:\n{always}" if always else ""))
-    messages = [{"role": "system", "content": system}, *history[-6:],
-                {"role": "user", "content": f"Facts:\n{facts}\n\nQuestion: {question}"}]
-    reply = ask_model(messages, stream_to)
+    return [{"role": "system", "content": system}, *history[-6:],
+            {"role": "user", "content": f"Facts:\n{facts}\n\nQuestion: {question}"}]
+
+
+def answer(question: str, retriever: Retriever, history: list[dict], stream_to=sys.stdout) -> str:
+    reply = ask_model(build_messages(question, retriever, history), stream_to)
     # Keep the plain question (without the facts) in history so follow-ups stay short
     history += [{"role": "user", "content": question}, {"role": "assistant", "content": reply}]
     return reply
